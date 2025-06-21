@@ -26,6 +26,9 @@
                 #future # solves https://github.com/tomv564/pyls-mypy/issues/37
               ]))
             ];
+            shellHook = ''
+              export PATH="$PWD/node_modules/.bin/:$PATH"
+            '';
           };
         }
       );
