@@ -1,0 +1,8 @@
+{
+  "source": "src/index.html",
+  "devDependencies": {
+    "@vanillawc/wc-codemirror": "^2.1.0",
+    "parcel": "^2.15.2",
+    "typescript": "^5.8.3"
+  }
+}

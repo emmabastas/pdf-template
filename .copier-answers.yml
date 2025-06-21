@@ -1,0 +1,12 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: b23718a
+_src_path: git+https://git.sr.ht/~emmabastas/min-template
+changelog: true
+editorconfig: true
+gitinit: srht
+gitreponame: pdf-template
+license: true
+name: pdf-template
+nix: true
+projectType:
+- Python+Nix
