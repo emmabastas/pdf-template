@@ -6,6 +6,7 @@
   <title>Template 2</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script type="module" src="./components.ts"></script>
+  <script type="module" src="./index.ts"></script>
   <script type="module" src="../node_modules/@vanillawc/wc-codemirror/index.js"></script>
 </head>
 <body class="bg-gray-100 w-screen h-screen">
@@ -20,7 +21,7 @@
     </m-row>
 
     <!-- Body -->
-    <m-row class="gap-4 bg-white p-6 rounded shaddow grow">
+    <m-row class="gap-4 bg-white p-6 rounded shaddow grow h-full max-h-full">
 
       <!-- Form field + editor tabs -->
       <m-col class="max-w-l grow">
@@ -40,7 +41,7 @@
 
         <!-- Form Fields -->
         <m-col id="form" class="gap-6 bg-white p-6 rounded shadow grow">
-          <m-col class="gap-4 overflow-auto grow shrink basis-0">
+          <m-col id="fields-container" class="gap-4 overflow-auto grow shrink basis-0">
             <div class="flex flex-col gap-1">
               <label class="font-medium">Label</label>
               <input type="text" placeholder="Input text" class="border p-2 rounded" />
@@ -69,37 +70,29 @@
 
           <!-- Action Buttons -->
           <m-row class="gap-2">
-            <button class="border px-4 py-2 rounded hover:bg-gray-200">Update</button>
+            <button id="update-btn1" class="border px-4 py-2 rounded hover:bg-gray-200">Update</button>
             <button class="border px-4 py-2 rounded hover:bg-gray-200">Download</button>
           </m-row>
         </m-col>
 
         <m-col id="editor" class="grow p-6 rounded shadow">
-          <script type="module">
-            if ('serviceWorker' in navigator) {
-              navigator.serviceWorker.register(new URL('./serviceWorker.ts', import.meta.url))
-                .then(() => console.log('Service Worker registered!'))
-                .catch((err) => console.error('Service Worker registration failed:', err));
-            }
-
-          </script>
-          <div class="grow">
-            <wc-codemirror mode="typst" src="/initial-source.typ"></wc-codemirror>
+          <div id="editor-div" class="grow">
+            <!-- Actual codemirror component goes here -->
           </div>
 
           <!-- Action Buttons -->
           <m-row class="gap-2">
-            <button class="border px-4 py-2 rounded hover:bg-gray-200">Update</button>
+            <button id="update-btn2" class="border px-4 py-2 rounded hover:bg-gray-200">Update</button>
             <button class="border px-4 py-2 rounded hover:bg-gray-200">Save</button>
             <button class="border px-4 py-2 rounded hover:bg-gray-200">Save as</button>
           </m-row>
         </m-col>
       </m-col>
       <!-- Preview -->
-      <div class="grow bg-black">
-      </div>
+      <m-col class="grow overflow-x-auto bg-white shadow rounded">
+        <div id="preview" class="grow shrink basis-0 overflow-y-auto "></div>
+      </m-col>
     </m-row>
-    </div>
   </div>
 </body>
 </html>

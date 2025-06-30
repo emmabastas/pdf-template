@@ -22,13 +22,14 @@
       "es2022",
       "dom",
       "dom.iterable"
-    ]
+    ],
+    "moduleResolution": "bundler",
   },
   // Include the necessary files for your project
   "include": [
     "**/*.ts",
     "**/*.tsx"
-  ],
+, "src/mre.ts~", "src/index.ts~", "src/index.ts~", "src/components/pdfpreview.ts~", "vendor/pdfjs-5.3.31/build/pdf.ts~", "src/components/pdfpreview.ts~"  ],
   "exclude": [
     "node_modules"
   ]

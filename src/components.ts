@@ -1,7 +1,10 @@
 class Row extends HTMLElement {
   constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
+    super()
+  }
+
+  connectedCallback() {
+    const shadow = this.attachShadow({ mode: 'open' })
     shadow.innerHTML += `
     <style>
       :host {
@@ -10,14 +13,17 @@ class Row extends HTMLElement {
       }
     </style>
     <slot></slot>
-    `;
+    `
   }
 }
 
 class Col extends HTMLElement {
   constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
+    super()
+  }
+
+  connectedCallback() {
+    const shadow = this.attachShadow({ mode: 'open' })
     shadow.innerHTML += `
     <style>
       :host {
@@ -26,7 +32,7 @@ class Col extends HTMLElement {
       }
     </style>
     <slot></slot>
-    `;
+    `
   }
 }
 

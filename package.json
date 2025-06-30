@@ -1,8 +1,16 @@
 {
   "source": "src/index.html",
   "devDependencies": {
+    "@myriaddreamin/typst-ts-renderer": "^0.6.1-rc1",
+    "@myriaddreamin/typst-ts-web-compiler": "^0.6.1-rc1",
+    "@myriaddreamin/typst.ts": "^0.6.1-rc1",
+    "@parcel/transformer-inline-string": "^2.15.2",
     "@vanillawc/wc-codemirror": "^2.1.0",
+    "buffer": "^6.0.3",
     "parcel": "^2.15.2",
+    "pdf-viewer-element": "^0.1.0-pre.4",
+    "process": "^0.11.10",
+    "ts-json-validator": "git+ssh://git@github.com:nwtgck/ts-json-validator.git#3b2ce85",
     "typescript": "^5.8.3"
   }
 }
