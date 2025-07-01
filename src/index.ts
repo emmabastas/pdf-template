@@ -1,58 +1,18 @@
 import * as c from "@myriaddreamin/typst-ts-web-compiler"
 import * as r from "@myriaddreamin/typst-ts-renderer"
-import * as v from 'ts-json-validator';
-import type { TsType } from "ts-json-validator"
+import type { ShortText } from "./components"
+import * as v from "ts-json-validator"
+import { typstFieldQueryParser } from "./parsers"
+import type { Field } from "./parsers"
+import { EditorView, basicSetup } from "codemirror"
+import { EditorState } from "@codemirror/state"
 
 //@ts-ignore
 import pdfTemplateTypstSource from "bundle-text:./pdf-template.typ"
 
 //@ts-ignore
 import placeholderTypstSource from "bundle-text:./placeholder.typ"
-
-const fieldParser = v.obj({
-    "type": v.literal("text" as const),
-    "name": v.str,
-    "description": v.opt(v.str),
-    "default": v.opt(v.str),
-})
-const typstFieldQueryParser = v.arr(
-  v.obj({
-    "func": v.literal("metadata" as const),
-    "label": v.literal("<pdf-template-field>" as const),
-    "value": fieldParser,
-  })
-)
-type Field = TsType<typeof fieldParser>
-//const fieldParser = new TsjsonParser(
-//  S({
-//    oneOf: [
-//      S({
-//        type: "object",
-//        properties: {
-//          "type": S({ const: "text" }),
-//          "name": S({ type: "string" }),
-//          "description": S({ type: "string" }),
-//          "default": S({ type: "string" }),
-//        },
-//        required: [ "type", "name" ],
-//      })
-//    ],
-//  }),
-//);
-//const typstFieldsQueryParser = new TsjsonParser(
-//  S({
-//    type: "array",
-//    items: S({
-//      type: "object",
-//      properties: {
-//        "func": S({ const: "metadata" }),
-//        "label": S({ const: "<pdf-template-field>" }),
-//        "value": fieldParser.schema,
-//      },
-//      required: [ "func", "label", "value" ],
-//    })
-//  })
-//);
+import type { EditorViewConfig } from "@codemirror/view"
 
 interface TypstPackageRequest {
   name: string;
@@ -86,8 +46,11 @@ const textFontsPrefix = "https://cdn.jsdelivr.net/gh/typst/typst-assets@v0.13.1/
 // nonblocking a maner as feasible.
 class Session {
   public readonly fields: Promise<HTMLElement>
+  public readonly editor: Promise<HTMLElement>
   public readonly update1: Promise<HTMLButtonElement>
   public readonly update2: Promise<HTMLButtonElement>
+  public readonly codemirror: Promise<EditorView>
+  private cmresolve: (_: EditorView) => void
 
   private renderer: Promise<r.TypstRenderer>
   private fontData: Promise<Uint8Array<ArrayBufferLike>[]>
@@ -132,12 +95,46 @@ class Session {
         await builder.add_raw_font(data)
       }
       const compiler = await builder.build()
+      compiler.add_source("/pdf-template-field-inputs.json", "{}")
       return compiler
     })
 
-    this.fields = waitForElem("#fields-container") as Promise<HTMLElement>
-    this.update1 = waitForElem("button#update-btn1") as Promise<HTMLButtonElement>
-    this.update2 = waitForElem("button#update-btn2") as Promise<HTMLButtonElement>
+    const documentReady = new Promise<void>(resolve => {
+      if(document.readyState === "complete") {
+        resolve()
+      } else {
+        document.addEventListener("DOMContentLoaded", () => resolve())
+      }
+    })
+
+    this.editor = documentReady.then(() => {
+      const elem = document.querySelector("#editor-div")
+      if (!(elem instanceof HTMLElement)) throw new Error("Could not find #editor-div element")
+      return elem
+    })
+
+    this.fields = documentReady.then(() => {
+      const elem = document.querySelector("#fields-container")
+      if (!(elem instanceof HTMLElement)) throw new Error("Could not find #fields-container element")
+      return elem
+    })
+
+    this.update1 = documentReady.then(() => {
+      const elem = document.querySelector("button#update-btn1")
+      if (!(elem instanceof HTMLButtonElement)) throw new Error("Could not find #update-btn1 button")
+      return elem
+    })
+
+    this.update2 = documentReady.then(() => {
+      const elem = document.querySelector("button#update-btn2")
+      if (!(elem instanceof HTMLButtonElement)) throw new Error("Could not find #update-btn2 button")
+      return elem
+    })
+
+    this.cmresolve = () => {}
+    this.codemirror = new Promise((resolve, _) => {
+      this.cmresolve = resolve
+    })
   }
 
   async getRenderer(): Promise<r.TypstRenderer> {
@@ -149,12 +146,17 @@ class Session {
   }
 
   async getNewCompilerBuilder(): Promise<c.TypstCompilerBuilder> {
+
     await this.cInitialized
     const builder = new c.TypstCompilerBuilder()
     for (const data of await this.fontData) {
       await builder.add_raw_font(data)
     }
     return builder
+  }
+
+  setCodeMirrorInstance(view: EditorView) {
+    this.cmresolve(view)
   }
 }
 
@@ -165,29 +167,39 @@ async function main() {
   const session = new Session()
 
   // Create the editor
-  waitForElem("#editor-div").then(elem => {
-    elem.innerHTML += `
-<wc-codemirror mode="typst">
-  <script type="wc-content">
-  ${typstSource}
-  </script>
-</wc-codemirror>
-`
+  session.editor.then(elem => {
+    const shadow = elem.attachShadow({ mode: "open" })
+    const state = EditorState.create({
+      doc: typstSource,
+      extensions: [
+        basicSetup,
+      ],
+    });
+    const view = new EditorView({
+      state,
+      parent: shadow,
+      root: shadow,
+    });
+    session.setCodeMirrorInstance(view)
   });
 
   // Determine which fields are expected
-  // TODO
-  (async function() {
-    const fields = await getFields(session, typstSource)
-    const elements: Node[] = fields.map(field => {
-      const elem = document.createElement("p")
-      elem.innerHTML = field.name
-      return elem
-    })
+  updateFields(session)
 
-    const fieldsContainer = await session.fields
-    fieldsContainer.replaceChildren(...elements)
-  })()
+  // Whenever the "Render" tab is active (i.e. URL fragment is #form), we should upd
+  window.addEventListener("hashchange", async () => {
+    if (window.location.hash === "#form") {
+      try {
+        await updateFields(session)
+      } catch (e) {
+        // Is it an expected syntax/etc in the typst code?
+        if (!(e as Error).toString().startsWith("[SourceDiagnostic")) {
+          throw e
+        }
+        console.log(e)
+      }
+    }
+  })
 
   const elem = await waitForElem("#preview")
   const cb = renderCallback.bind(null, session, elem as HTMLElement)
@@ -207,9 +219,31 @@ async function getFields(session: Session, typstSource: string): Promise<Field[]
     }
     return r.map(e => e.value)
   })()
-  return fields
 
-  // TODO deduplicate
+  // deduplicate
+  const deduplicatedFields = fields.filter((field, index, self) =>
+    index === self.findIndex((t) => t.name === field.name)
+  );
+  return deduplicatedFields;  
+}
+
+async function getCurrentSource(session: Session): Promise<string> {
+  return (await session.codemirror).state.doc.toString()
+}
+
+async function updateFields(session: Session) {
+  const fields = await getFields(session, await getCurrentSource(session))
+  const elements: Node[] = fields.map(field => {
+    const elem = document.createElement("m-short-text")
+    elem.setAttribute("id",`typst-input-${field.name}`)
+    elem.setAttribute("label", field.name)
+    elem.setAttribute("placeholder", field.default ?? "")
+    elem.innerHTML = field.name
+    return elem
+  })
+
+  const fieldsContainer = await session.fields
+  fieldsContainer.replaceChildren(...elements)
 }
 
 async function renderCallback(
@@ -224,9 +258,24 @@ async function renderCallback(
   })
   const compiler = await cbuilder.build()
 
-  const source: string = (document.querySelector("wc-codemirror") as any).value
+  const source = await getCurrentSource(s)
   compiler.add_source("/main.typ", source)
   compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
+
+  // Get the values of the fields
+  const fieldElems = [...(await s.fields).children]
+  const fieldValues: Record<string, string> = {}
+  for (const elem of fieldElems) {
+    console.log(elem)
+    const st = elem as ShortText
+    fieldValues[st.label] = st.value
+  }
+  console.log(fieldValues)
+  console.log(`#let json = "${JSON.stringify(fieldValues)}"`)
+  compiler.add_source(
+    "/pdf-template-field-inputs.json",
+    JSON.stringify(fieldValues)
+  )
 
   const artifact = compiler.compile("/main.typ", null, "vector", 0)
 

@@ -1,3 +1,5 @@
+#let fieldInputs = json("/pdf-template-field-inputs.json")
+
 #let text(name: none, description: none, default: none) = {
     assert(name != none,
         message: "`name` keyword is required")
@@ -15,13 +17,14 @@
         default: default,
     ))
 
-    let value = dictionary(sys).at(name, default: default)
+    let value = fieldInputs.at(name, default: none)
     if value == none {
         return [
-            $#rect(stroke: 1pt)[name]$
+            $#rect(stroke: 1pt)[#name]$
             #meta <pdf-template-field>
         ]
     }
+
     assert(type(value) == str, message: "TODO message")
     return [
         #value

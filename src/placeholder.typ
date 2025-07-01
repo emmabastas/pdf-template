@@ -1,4 +1,4 @@
-#import "pdf-template.typ"
+#import "/pdf-template.typ"
 
 #let world = pdf-template.text.with(
     name: "world",
