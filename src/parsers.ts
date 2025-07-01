@@ -1,6 +1,21 @@
 import * as v from 'ts-json-validator';
 import type { TsType } from "ts-json-validator"
 
+export const validatingParse = v.validatingParse
+
+// Templates as stored in localstorage
+
+export const templateDocumentParser = v.obj({
+  "name": v.str,
+  "typstSource": v.str
+})
+
+export const templateDocumentsParser = v.arr(templateDocumentParser)
+
+export type TemplateDocument = TsType<typeof templateDocumentParser>
+
+// Typst queries on templates
+
 export const fieldParser = v.obj({
   "type": v.literal("text" as const),
   "name": v.str,
@@ -17,34 +32,3 @@ export const typstFieldQueryParser = v.arr(
 )
 
 export type Field = TsType<typeof fieldParser>
-
-//const fieldParser = new TsjsonParser(
-//  S({
-//    oneOf: [
-//      S({
-//        type: "object",
-//        properties: {
-//          "type": S({ const: "text" }),
-//          "name": S({ type: "string" }),
-//          "description": S({ type: "string" }),
-//          "default": S({ type: "string" }),
-//        },
-//        required: [ "type", "name" ],
-//      })
-//    ],
-//  }),
-//);
-//const typstFieldsQueryParser = new TsjsonParser(
-//  S({
-//    type: "array",
-//    items: S({
-//      type: "object",
-//      properties: {
-//        "func": S({ const: "metadata" }),
-//        "label": S({ const: "<pdf-template-field>" }),
-//        "value": fieldParser.schema,
-//      },
-//      required: [ "func", "label", "value" ],
-//    })
-//  })
-//);

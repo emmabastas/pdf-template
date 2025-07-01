@@ -36,6 +36,37 @@ export class Row extends HTMLElement {
   }
 }
 
+export class Route extends HTMLElement {
+  private anchor: HTMLAnchorElement
+  constructor() {
+    super()
+    this.anchor = document.createElement('a')
+    this.anchor.innerHTML = "<slot></slot>"
+    this.anchor.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      window.history.pushState({}, '', this.anchor.href)
+    })
+    this
+      .attachShadow({ mode: 'open' })
+      .appendChild(this.anchor)
+  }
+
+  connectedCallback() {
+  }
+
+  static get observedAttributes() {
+    return ['href']
+  }
+
+  attributeChangedCallback(name: string, _oldValue: string, newValue: string) {
+    if (name === 'href') {
+      this.anchor.href = newValue
+    }
+  }
+}
+
 export class ShortText extends HTMLElement {
   private labelElement: HTMLLabelElement
   private inputElement: HTMLInputElement
@@ -96,6 +127,7 @@ let registerd = false
 function register() {
   customElements.define('m-row', Row);
   customElements.define('m-col', Col);
+  customElements.define('m-route', Route);
   customElements.define('m-short-text', ShortText);
 }
 if (registerd === false) {

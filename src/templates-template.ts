@@ -8,6 +8,9 @@ import { EditorView, basicSetup } from "codemirror"
 import { EditorState } from "@codemirror/state"
 
 //@ts-ignore
+import html from "bundle-text:./templates-template.html"
+
+//@ts-ignore
 import pdfTemplateTypstSource from "bundle-text:./pdf-template.typ"
 
 //@ts-ignore
@@ -45,11 +48,7 @@ const textFontsPrefix = "https://cdn.jsdelivr.net/gh/typst/typst-assets@v0.13.1/
 // This class is in charge of loading all the async data we need in as
 // nonblocking a maner as feasible.
 class Session {
-  public readonly fields: Promise<HTMLElement>
-  public readonly editor: Promise<HTMLElement>
-  public readonly update1: Promise<HTMLButtonElement>
-  public readonly update2: Promise<HTMLButtonElement>
-  public readonly codemirror: Promise<EditorView>
+  public codemirror: Promise<EditorView>
   private cmresolve: (_: EditorView) => void
 
   private renderer: Promise<r.TypstRenderer>
@@ -99,37 +98,14 @@ class Session {
       return compiler
     })
 
-    const documentReady = new Promise<void>(resolve => {
-      if(document.readyState === "complete") {
-        resolve()
-      } else {
-        document.addEventListener("DOMContentLoaded", () => resolve())
-      }
-    })
-
-    this.editor = documentReady.then(() => {
-      const elem = document.querySelector("#editor-div")
-      if (!(elem instanceof HTMLElement)) throw new Error("Could not find #editor-div element")
-      return elem
-    })
-
-    this.fields = documentReady.then(() => {
-      const elem = document.querySelector("#fields-container")
-      if (!(elem instanceof HTMLElement)) throw new Error("Could not find #fields-container element")
-      return elem
-    })
-
-    this.update1 = documentReady.then(() => {
-      const elem = document.querySelector("button#update-btn1")
-      if (!(elem instanceof HTMLButtonElement)) throw new Error("Could not find #update-btn1 button")
-      return elem
-    })
-
-    this.update2 = documentReady.then(() => {
-      const elem = document.querySelector("button#update-btn2")
-      if (!(elem instanceof HTMLButtonElement)) throw new Error("Could not find #update-btn2 button")
-      return elem
-    })
+    //const documentReady = new Promise<void>(resolve => {
+    //  if(document.readyState === "complete") {
+    //    resolve()
+    //  } else {
+    //    document.addEventListener("DOMContentLoaded", () => resolve())
+    //  }
+    //})
+    const documentReady = Promise.resolve()
 
     this.cmresolve = () => {}
     this.codemirror = new Promise((resolve, _) => {
@@ -160,37 +136,101 @@ class Session {
   }
 }
 
-async function main() {
+function assert(cond: boolean) {
+  if (!cond) {
+    throw new Error("Assertion failed")
+  }
+}
 
-  const typstSource: string = placeholderTypstSource
+export async function takeover() {
+
+  document.title = "my-awesome-tempate"
+
+  const doc = new DOMParser().parseFromString(html, "text/html")
+  document.body.replaceChildren(...doc.body.children)
+
+  const saveBtn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#save-btn")
+    assert(e instanceof HTMLButtonElement)
+    return e as HTMLButtonElement
+  })()
+
+  const saveAsBtn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#save-as-btn")
+    assert(e instanceof HTMLButtonElement)
+    return e as HTMLButtonElement
+  })()
+
+  // See https://github.com/remix-run/history/issues/503
+  window.location.hash = "#form"
+
+  const typstSource: string =
+        window.localStorage.getItem(["templates", "my-awesome-template"].toString())
+        ?? placeholderTypstSource
 
   const session = new Session()
 
+  saveBtn.addEventListener("click", async () => {
+    window.localStorage.setItem(
+      ["templates", "my-awesome-template"].toString(),
+      await getCurrentSource(session)
+    )
+  })
+
+  // Assign elements to session using the same pattern as saveBtn
+  const editorElem: HTMLElement = (function () {
+    const e = document.querySelector("#editor-div")
+    assert(e instanceof HTMLElement)
+    return e as HTMLElement
+  })()
+
+  const fieldsElem: HTMLElement = (function () {
+    const e = document.querySelector("#fields-container")
+    assert(e instanceof HTMLElement)
+    return e as HTMLElement
+  })()
+
+  const update1Btn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#update-btn1")
+    assert(e instanceof HTMLButtonElement)
+    return e as HTMLButtonElement
+  })()
+
+  const update2Btn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#update-btn2")
+    assert(e instanceof HTMLButtonElement)
+    return e as HTMLButtonElement
+  })()
+
+  const preview: HTMLElement = (function () {
+    const e = document.querySelector("#preview")
+    assert(e instanceof HTMLElement)
+    return e as HTMLElement
+  })()
+
   // Create the editor
-  session.editor.then(elem => {
-    const shadow = elem.attachShadow({ mode: "open" })
-    const state = EditorState.create({
-      doc: typstSource,
-      extensions: [
-        basicSetup,
-      ],
-    });
-    const view = new EditorView({
-      state,
-      parent: shadow,
-      root: shadow,
-    });
-    session.setCodeMirrorInstance(view)
+  const shadow = editorElem.attachShadow({ mode: "open" })
+  const state = EditorState.create({
+    doc: typstSource,
+    extensions: [
+      basicSetup,
+    ],
   });
+  const view = new EditorView({
+    state,
+    parent: shadow,
+    root: shadow,
+  });
+  session.setCodeMirrorInstance(view)
 
   // Determine which fields are expected
-  updateFields(session)
+  updateFields(session, fieldsElem)
 
   // Whenever the "Render" tab is active (i.e. URL fragment is #form), we should upd
   window.addEventListener("hashchange", async () => {
     if (window.location.hash === "#form") {
       try {
-        await updateFields(session)
+        await updateFields(session, fieldsElem)
       } catch (e) {
         // Is it an expected syntax/etc in the typst code?
         if (!(e as Error).toString().startsWith("[SourceDiagnostic")) {
@@ -201,10 +241,9 @@ async function main() {
     }
   })
 
-  const elem = await waitForElem("#preview")
-  const cb = renderCallback.bind(null, session, elem as HTMLElement)
-  session.update1.then(btn => btn.addEventListener("click", cb))
-  session.update2.then(btn => btn.addEventListener("click", cb))
+  const cb = renderCallback.bind(null, session, preview, fieldsElem)
+  update1Btn.addEventListener("click", cb)
+  update2Btn.addEventListener("click", cb)
 }
 
 async function getFields(session: Session, typstSource: string): Promise<Field[]> {
@@ -224,14 +263,14 @@ async function getFields(session: Session, typstSource: string): Promise<Field[]
   const deduplicatedFields = fields.filter((field, index, self) =>
     index === self.findIndex((t) => t.name === field.name)
   );
-  return deduplicatedFields;  
+  return deduplicatedFields;
 }
 
 async function getCurrentSource(session: Session): Promise<string> {
   return (await session.codemirror).state.doc.toString()
 }
 
-async function updateFields(session: Session) {
+async function updateFields(session: Session, fieldsElem: HTMLElement) {
   const fields = await getFields(session, await getCurrentSource(session))
   const elements: Node[] = fields.map(field => {
     const elem = document.createElement("m-short-text")
@@ -242,13 +281,13 @@ async function updateFields(session: Session) {
     return elem
   })
 
-  const fieldsContainer = await session.fields
-  fieldsContainer.replaceChildren(...elements)
+  fieldsElem.replaceChildren(...elements)
 }
 
 async function renderCallback(
   s: Session,
   renderTarget: HTMLElement,
+  fieldsElem: HTMLElement,
   _: Event): Promise<void>
 {
   const cbuilder = await s.getNewCompilerBuilder()
@@ -263,7 +302,7 @@ async function renderCallback(
   compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
 
   // Get the values of the fields
-  const fieldElems = [...(await s.fields).children]
+  const fieldElems = [...fieldsElem.children]
   const fieldValues: Record<string, string> = {}
   for (const elem of fieldElems) {
     console.log(elem)
@@ -296,8 +335,6 @@ async function renderCallback(
 
   }
 }
-
-main()
 
 // https://stackoverflow.com/a/61511955
 function waitForElem(selector: string): Promise<Element> {
