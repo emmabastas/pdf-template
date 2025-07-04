@@ -287,8 +287,10 @@ export async function takeover(documentName: string) {
     doc: typstSource,
     extensions: [
       basicSetup,
-      EditorView.updateListener.of(() => {
-        codeEditS.setValue(codeEditS.getValue() + 1)
+      EditorView.updateListener.of(e => {
+        if (e.docChanged) {
+          codeEditS.setValue(codeEditS.getValue() + 1)
+        }
       })
     ],
   });

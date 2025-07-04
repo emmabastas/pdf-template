@@ -1,6 +1,8 @@
 import * as landing from "./landing"
 import * as templates from "./templates"
 import * as templatesTemplate from "./templates-template"
+import * as about from "./about"
+import * as _404 from "./404"
 
 // Listen for popstate event (back/forward navigation)
 window.addEventListener('popstate', () => {
@@ -60,7 +62,7 @@ function callback() {
   prevOrigin = window.location.origin
   prevPathname = window.location.pathname
 
-  let path = window.location.pathname.split("/").filter(e => e !== "")
+  let path = decodeURI(window.location.pathname).split("/").filter(e => e !== "")
 
   if (path.length === 0) {
     landing.takeover()
@@ -72,13 +74,17 @@ function callback() {
     return
   }
 
-  if (path.length === 2 && path[0] == "templates") {
-    const isNew = new URLSearchParams(window.location.search).get("new") !== null
-    templatesTemplate.takeover(path[1]!, isNew)
+  if (path.length === 2 && path[0] === "templates") {
+    templatesTemplate.takeover(path[1]!)
     return
   }
 
-  throw new Error("TODO 404")
+  if (path.length === 1 && path[0] === "about") {
+    about.takeover()
+    return
+  }
+
+  _404.takeover()
 }
 
 if (document.readyState === "complete") {
