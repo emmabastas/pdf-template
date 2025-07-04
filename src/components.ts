@@ -41,6 +41,93 @@ export class Row extends HTMLElement {
   }
 }
 
+export class Divider extends HTMLElement {
+  private dividerEl: HTMLDivElement
+  private firstContainer: HTMLElement
+  private isDragging: boolean = false
+  private xOffset: number = 0
+  private width: number = 0
+
+  constructor() {
+    super()
+
+    const shadow = this.attachShadow({ mode: 'open' })
+
+    shadow.innerHTML = `
+      <style>
+        :host > div {
+          display: flex;
+          flex-direction: row;
+          width: 100%;
+          height: 100%;
+        }
+        .first-container, .second-container {
+          height: 100%;
+          flex: 1;
+          min-width: 0;
+          overflow: hidden;
+        }
+        .divider {
+          width: 4px;
+          margin-left: 8px;
+          margin-right: 8px;
+          background: #e5e7eb;
+          cursor: col-resize;
+          transition: background-color 0.2s;
+        }
+        .divider:hover, .divider.dragging {
+          background: #9ca3af;
+        }
+      </style>
+      <div>
+        <div class="first-container">
+          <slot name="left"></slot>
+        </div>
+        <div class="divider"></div>
+        <div class="second-container">
+          <slot name="right"></slot>
+        </div>
+      </div>
+    `
+
+    this.dividerEl = shadow.querySelector('.divider') as HTMLDivElement
+    this.firstContainer = shadow.querySelector(".first-container") as HTMLElement
+
+    this.dividerEl.addEventListener('mousedown', this.startDragging.bind(this))
+    document.addEventListener('mousemove', this.onDrag.bind(this))
+    document.addEventListener('mouseup', this.stopDragging.bind(this))
+  }
+
+  private startDragging(e: MouseEvent) {
+    this.isDragging = true
+    this.xOffset = this.getBoundingClientRect().x
+    this.width = this.getBoundingClientRect().width
+    this.dividerEl.classList.add('dragging')
+  }
+
+  private onDrag(e: MouseEvent) {
+    if (!this.isDragging) return
+
+    let x = (e.clientX - this.xOffset)
+    x = Math.max(200, x)
+    x = Math.min(this.width - 200, x)
+    this.firstContainer.style.width = `${x}px`
+    this.firstContainer.style.maxWidth = `${x}px`
+    this.firstContainer.style.minWidth = `${x}px`
+  }
+
+  private stopDragging() {
+    this.isDragging = false
+    this.dividerEl.classList.remove('dragging')
+  }
+
+  disconnectedCallback() {
+    document.removeEventListener('mousemove', this.onDrag.bind(this))
+    document.removeEventListener('mouseup', this.stopDragging.bind(this))
+  }
+}
+
+
 export class Route extends HTMLElement {
   private anchor: HTMLAnchorElement
   constructor() {
@@ -72,7 +159,7 @@ export class Route extends HTMLElement {
   }
 }
 
-export class ShortText extends HTMLElement {
+export class ShortTextField extends HTMLElement {
   private labelElement: HTMLLabelElement
   private inputElement: HTMLInputElement
   private container: HTMLElement
@@ -105,9 +192,10 @@ export class ShortText extends HTMLElement {
   connectedCallback() {
     const label = this.getAttribute('label') ?? '';
     const placeholder = this.getAttribute('placeholder') ?? '';
-    const value = this.getAttribute('value') ?? '';
+    const value = this.getAttribute('value');
+    this.labelElement.textContent = label
     this.inputElement.placeholder = placeholder;
-    this.inputElement.value = value;
+    this.inputElement.value = value ?? "";
 
     this
       //.attachShadow({ mode: "open" }) Shadow DOM makes tailwind classes not
@@ -119,8 +207,135 @@ export class ShortText extends HTMLElement {
     return ['label', 'placeholder', 'value'];
   }
 
-  get value() {
-    return (this.inputElement.value || this.getAttribute("placeholder")) ?? ""
+  get value(): string | null {
+    return (this.inputElement.value || this.getAttribute("placeholder"))
+  }
+
+  get label() {
+    return this.getAttribute('label') ?? '';
+  }
+}
+
+export class LongTextField extends HTMLElement {
+  private labelElement: HTMLLabelElement
+  private textareaElement: HTMLTextAreaElement
+  private container: HTMLElement
+
+  constructor() {
+    const inputId = `input-${Math.random().toString(36).substr(2, 9)}`;
+
+    const container = document.createElement('m-col');
+    container.className = 'gap-1';
+
+    const labelElement = document.createElement('label');
+    labelElement.htmlFor = inputId;
+    labelElement.className = 'text-sm font-medium text-gray-700';
+
+    const textareaElement = document.createElement('textarea');
+    textareaElement.id = inputId;
+    textareaElement.className = 'px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-base';
+    textareaElement.rows = 1;
+    textareaElement.style.resize = 'vertical';
+    textareaElement.style.minHeight = '42px'; // Match single line height
+    textareaElement.style.maxHeight = '170px'; // Approximately 5 lines for auto-expansion
+
+    // Auto-expand logic
+    textareaElement.addEventListener('input', () => {
+      textareaElement.style.height = '42px'; // Reset height
+      const scrollHeight = textareaElement.scrollHeight;
+      textareaElement.style.height = Math.min(scrollHeight, 170) + 'px';
+    });
+
+    container.appendChild(labelElement);
+    container.appendChild(textareaElement);
+
+    super();
+
+    this.labelElement = labelElement
+    this.textareaElement = textareaElement;
+    this.container = container;
+  }
+
+  connectedCallback() {
+    const label = this.getAttribute('label') ?? '';
+    const placeholder = this.getAttribute('placeholder') ?? '';
+    const value = this.getAttribute('value');
+    this.labelElement.textContent = label
+    this.textareaElement.placeholder = placeholder;
+    this.textareaElement.value = value ?? "";
+
+    // Trigger initial height calculation
+    const event = new Event('input');
+    this.textareaElement.dispatchEvent(event);
+
+    this.append(this.container)
+  }
+
+  static get observedAttributes() {
+    return ['label', 'placeholder', 'value'];
+  }
+
+  get value(): string | null {
+    return (this.textareaElement.value || this.getAttribute("placeholder"))
+  }
+
+  get label() {
+    return this.getAttribute('label') ?? '';
+  }
+}
+
+
+export class NumberField extends HTMLElement {
+  private labelElement: HTMLLabelElement
+  private inputElement: HTMLInputElement
+  private container: HTMLElement
+
+  constructor() {
+    const inputId = `input-${Math.random().toString(36).substr(2, 9)}`;
+
+    const container = document.createElement('m-col');
+    container.className = 'gap-1';
+
+    const labelElement = document.createElement('label');
+    labelElement.htmlFor = inputId;
+    labelElement.className = 'text-sm font-medium text-gray-700';
+
+    const inputElement = document.createElement('input');
+    inputElement.id = inputId;
+    inputElement.type = 'number';
+    inputElement.className = 'px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition text-base';
+
+    container.appendChild(labelElement);
+    container.appendChild(inputElement);
+
+    super();
+
+    this.labelElement = labelElement
+    this.inputElement = inputElement;
+    this.container = container;
+  }
+
+  connectedCallback() {
+    const label = this.getAttribute('label') ?? '';
+    const placeholder = this.getAttribute('placeholder') ?? '';
+    const value = this.getAttribute('value') ?? '';
+    this.labelElement.textContent = label;
+    this.inputElement.placeholder = placeholder;
+    this.inputElement.value = value;
+
+    this.append(this.container)
+  }
+
+  static get observedAttributes() {
+    return ['label', 'placeholder', 'value'];
+  }
+
+  get value(): number | null {
+    const rawValue = this.inputElement.value || this.getAttribute("placeholder");
+    if (!rawValue) return null;
+
+    const num = Number(rawValue);
+    return isNaN(num) ? null : num;
   }
 
   get label() {
@@ -379,7 +594,10 @@ function register() {
   customElements.define('m-row', Row);
   customElements.define('m-col', Col);
   customElements.define('m-route', Route);
-  customElements.define('m-short-text', ShortText);
+  customElements.define('m-divider', Divider);
+  customElements.define('m-short-text', ShortTextField);
+  customElements.define('m-long-text', LongTextField);
+  customElements.define('m-number', NumberField);
   customElements.define('m-template-item', TemplateItem);
   customElements.define("m-icon-trash", IconTrash)
   customElements.define("m-icon-rename", IconRename)

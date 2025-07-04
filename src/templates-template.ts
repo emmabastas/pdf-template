@@ -1,6 +1,6 @@
 import * as c from "@myriaddreamin/typst-ts-web-compiler"
 import * as r from "@myriaddreamin/typst-ts-renderer"
-import type { ShortText } from "./components"
+import { ShortTextField, LongTextField, NumberField } from "./components"
 import * as v from "ts-json-validator"
 import { typstFieldQueryParser } from "./parsers"
 import type { Field } from "./parsers"
@@ -8,7 +8,7 @@ import { EditorView, basicSetup } from "codemirror"
 import { EditorState } from "@codemirror/state"
 import * as ls from "./localstorage"
 import * as router from "./router"
-import { just, nothing, assert, Signal } from "./utils"
+import { just, nothing, assert, assertNever, Signal } from "./utils"
 import * as utils from "./utils"
 
 //@ts-ignore
@@ -249,21 +249,9 @@ export async function takeover(documentName: string) {
   })
 
   downloadBtn.addEventListener("click", async () => {
-    const compiler = await (await session.getNewCompilerBuilder()).build()
-    compiler.add_source("/main.typ", await getCurrentSource(session))
-    compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
-    const fieldElems = [...fieldsElem.children]
-    const fieldValues: Record<string, string> = {}
-    for (const elem of fieldElems) {
-      console.log(elem)
-      const st = elem as ShortText
-      fieldValues[st.label] = st.value
+    if (compilationStatusS.getValue().status === "failure") {
+      return
     }
-  console.log(`#let json = "${JSON.stringify(fieldValues)}"`)
-  compiler.add_source(
-    "/pdf-template-field-inputs.json",
-    JSON.stringify(fieldValues)
-  )
     const pdf = compiler.compile("/main.typ", null, "pdf", 0)
     const blob = new Blob([pdf], { type: 'application/pdf' })
     const url = URL.createObjectURL(blob)
@@ -372,12 +360,28 @@ export async function takeover(documentName: string) {
 
   fieldsS.dedupe(utils.compare).listen(fields => {
     const elements: Node[] = fields.map(field => {
-      const elem = document.createElement("m-short-text")
-      elem.setAttribute("id",`typst-input-${field.name}`)
-      elem.setAttribute("label", field.name)
-      elem.setAttribute("placeholder", field.default ?? "")
-      elem.innerHTML = field.name
-      return elem
+      if (field.type === "shortText") {
+        const elem = document.createElement("m-short-text")
+        elem.setAttribute("id",`typst-input-${field.name}`)
+        elem.setAttribute("label", field.name)
+        elem.setAttribute("placeholder", field.default ?? "")
+        return elem
+      }
+      if (field.type === "longText") {
+        const elem = document.createElement("m-long-text")
+        elem.setAttribute("id",`typst-input-${field.name}`)
+        elem.setAttribute("label", field.name)
+        elem.setAttribute("placeholder", field.default ?? "")
+        return elem
+      }
+      if (field.type === "number") {
+        const elem = document.createElement("m-number")
+        elem.setAttribute("id",`typst-input-${field.name}`)
+        elem.setAttribute("label", field.name)
+        elem.setAttribute("placeholder", field.default ?? "")
+        return elem
+      }
+      throw new Error("Unreachable")
     })
     fieldsElem.replaceChildren(...elements)
   })
@@ -389,10 +393,21 @@ export async function takeover(documentName: string) {
 
       // Get the values of the fields
       const fieldElems = [...fieldsElem.children]
-      const fieldValues: Record<string, string> = {}
+      const fieldValues: Record<string, string | number | null> = {}
       for (const elem of fieldElems) {
-        const st = elem as ShortText
-        fieldValues[st.label] = st.value
+        if (elem instanceof ShortTextField) {
+          fieldValues[elem.label] = elem.value
+          continue
+        }
+        if (elem instanceof LongTextField) {
+          fieldValues[elem.label] = elem.value
+          continue
+        }
+        if (elem instanceof NumberField) {
+          fieldValues[elem.label] = elem.value
+          continue
+        }
+        assertNever(elem)
       }
       compiler.add_source(
         "/pdf-template-field-inputs.json",
@@ -444,26 +459,10 @@ export async function takeover(documentName: string) {
       return "You have unsaved changes! Do you want to leave this page and discard them?"
     }
   })
-}
 
-async function getFields(session: Session, typstSource: string): Promise<Field[]> {
-  const compiler = await session.getDummyCompiler()
-  compiler.add_source("/main.typ", typstSource)
-  compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
-  const fieldsStr = compiler.query("/main.typ", null, "<pdf-template-field>", null)
-  const fields: Field[] = (function () {
-    const r = v.validatingParse(typstFieldQueryParser, fieldsStr)
-    if (typeof r === "undefined") {
-      throw new Error("Invalid query result", JSON.parse(fieldsStr))
-    }
-    return r.map(e => e.value)
-  })()
-
-  // deduplicate
-  const deduplicatedFields = fields.filter((field, index, self) =>
-    index === self.findIndex((t) => t.name === field.name)
-  );
-  return deduplicatedFields;
+  updateBtn.addEventListener("click", () => {
+    compilationStatusS.triggerUpdate()
+  })
 }
 
 async function getCurrentSource(session: Session): Promise<string> {

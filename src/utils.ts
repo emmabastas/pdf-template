@@ -188,6 +188,10 @@ export function assert(cond: boolean) {
   }
 }
 
+export function assertNever(value: never): never {
+  throw new Error(`Unexpected value: ${value}`);
+}
+
 const domParser = new DOMParser()
 
 export function parseHTML(source: string): HTMLElement {

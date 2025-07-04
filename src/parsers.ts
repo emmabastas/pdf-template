@@ -16,12 +16,26 @@ export type TemplateDocument = TsType<typeof templateDocumentParser>
 
 // Typst queries on templates
 
-export const fieldParser = v.obj({
-  "type": v.literal("text" as const),
-  "name": v.str,
-  "description": v.union(v.str, v.literal(null)),
-  "default": v.union(v.str, v.literal(null)),
-})
+export const fieldParser = v.union(
+  v.obj({
+    "type": v.literal("shortText" as const),
+    "name": v.str,
+    "description": v.union(v.str, v.literal(null)),
+    "default": v.union(v.str, v.literal(null)),
+  }),
+  v.obj({
+    "type": v.literal("longText" as const),
+    "name": v.str,
+    "description": v.union(v.str, v.literal(null)),
+    "default": v.union(v.str, v.literal(null)),
+  }),
+  v.obj({
+    "type": v.literal("number" as const),
+    "name": v.str,
+    "description": v.union(v.str, v.literal(null)),
+    "default": v.union(v.str, v.literal(null)),
+  }),
+)
 
 export const typstFieldQueryParser = v.arr(
   v.obj({
