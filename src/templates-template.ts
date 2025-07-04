@@ -8,7 +8,7 @@ import { EditorView, basicSetup } from "codemirror"
 import { EditorState } from "@codemirror/state"
 import * as ls from "./localstorage"
 import * as router from "./router"
-import { assert, Signal } from "./utils"
+import { just, nothing, assert, Signal } from "./utils"
 
 //@ts-ignore
 import html from "bundle-text:./templates-template.html"
@@ -308,14 +308,20 @@ export async function takeover(documentName: string) {
   // Whenever code is changed, the document is no longer saved.
   codeEditS.listen(() => isSavedS.setValue(false))
 
-  const fieldsS = new Signal<Field[]>([])
-
   const compiler = await (await session.getNewCompilerBuilder()).build()
   compiler.add_source("/main.typ", await getCurrentSource(session))
   compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
   compiler.add_source("/pdf-template-field-inputs.json", "{}")
   const incrCompiler = compiler.create_incr_server()
-  const compilationStatusS: Signal<"success" | { severity: string, message: string }> =
+  type CompilationStatus = {
+    status: "success",
+    fields: Field[],
+  } | {
+    status: "failure",
+    severity: string,
+    message: string,
+  }
+  const compilationStatusS: Signal<CompilationStatus> =
     codeEditS.debounce(500).map(() => {
       compiler.add_source("/main.typ", view.state.doc.toString())
 
@@ -328,9 +334,10 @@ export async function takeover(documentName: string) {
         }
         return validated.map(e => e.value)
       })()
-      console.log("ASDDSA")
-      fieldsS.setValue(fields)
-      return "success"
+      return {
+        status: "success",
+        fields: fields,
+      }
     } catch (e) {
       // Is it a typst compiler error? (The errors are strings it's wierd..)
       if (typeof e === "string" && e.startsWith("[SourceDiagnostic { ")) {
@@ -346,6 +353,7 @@ export async function takeover(documentName: string) {
             hints: hints ? hints.split(",").map(s => s.trim()) : []
           }
           return {
+            status: "failure",
             severity: diagnostic.severity,
             message: diagnostic.message,
           }
@@ -354,6 +362,14 @@ export async function takeover(documentName: string) {
         throw e
       }
       throw e
+    }
+  })
+
+  const fieldsS = compilationStatusS.filterMap([], status => {
+    if (status.status === "success") {
+      return just(status.fields)
+    } else {
+      return nothing()
     }
   })
 
@@ -370,8 +386,8 @@ export async function takeover(documentName: string) {
     fieldsElem.replaceChildren(...elements)
   })
 
-  compilationStatusS.listen(async (v) => {
-    if (v === "success") {
+  compilationStatusS.listen(async status => {
+    if (status.status === "success") {
       preview.style.display = ""
       errorMessageContainer.style.display = "none"
 
@@ -416,17 +432,14 @@ export async function takeover(documentName: string) {
     // Failure
     errorMessageContainer.innerHTML = `
     <m-col class="gap-4 grow h-full items-center justify-center">
-      <p class="text-lg">❗ ${v.severity} ❗</p>
-      <p class="text-md">${v.message}</p>
+      <p class="text-lg">❗ ${status.severity} ❗</p>
+      <p class="text-md">${status.message}</p>
     </m-col>
     `
     preview.style.display = "none"
     errorMessageContainer.style.display = ""
   })
 
-  fieldsS.triggerUpdate()  // TODO: This sould not be necessary?
-                           // `compilationStatus.truggerUpdate()` should also
-                           // trigger `fieldsS`
   compilationStatusS.triggerUpdate()
 
   // Have user confirm before leaving unsaved changes
