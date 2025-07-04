@@ -1,5 +1,6 @@
 import { validatingParse, templateDocumentsParser } from "./parsers"
 import type { TemplateDocument } from "./parsers"
+import * as utils from "./utils"
 
 export function allTemplateDocuments(): TemplateDocument[] {
   let s = localStorage.getItem("templateDocuments")
@@ -15,6 +16,10 @@ export function allTemplateDocuments(): TemplateDocument[] {
   }
 
   return parsed
+}
+
+function overwrite(docs: TemplateDocument[]) {
+  localStorage.setItem("templateDocuments", JSON.stringify(docs))
 }
 
 export function getTemplateDocument(name: string): TemplateDocument | null {
@@ -36,5 +41,20 @@ export function setTemplateDocument(doc: TemplateDocument) {
   const all = allTemplateDocuments()
     .filter(e => e.name !== doc.name)
   all.push(doc)
-  localStorage.setItem("templateDocuments", JSON.stringify(all))
+  overwrite(all)
+}
+
+export function deleteTemplateDocument(name: string, prompt?: boolean) {
+  utils.assert(getTemplateDocument(name) !== null)
+
+  if (prompt === false) {
+      const filtered = allTemplateDocuments().filter(d => d.name !== name)
+      overwrite(filtered)
+  } else {
+    const ans = confirm(`Are you sure you want to delete ${name}? Once deleted it cannot be undone!`)
+    if (ans) {
+      const filtered = allTemplateDocuments().filter(d => d.name !== name)
+      overwrite(filtered)
+    }
+  }
 }

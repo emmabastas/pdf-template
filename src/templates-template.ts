@@ -6,6 +6,9 @@ import { typstFieldQueryParser } from "./parsers"
 import type { Field } from "./parsers"
 import { EditorView, basicSetup } from "codemirror"
 import { EditorState } from "@codemirror/state"
+import * as ls from "./localstorage"
+import * as router from "./router"
+import { assert, Signal } from "./utils"
 
 //@ts-ignore
 import html from "bundle-text:./templates-template.html"
@@ -98,15 +101,6 @@ class Session {
       return compiler
     })
 
-    //const documentReady = new Promise<void>(resolve => {
-    //  if(document.readyState === "complete") {
-    //    resolve()
-    //  } else {
-    //    document.addEventListener("DOMContentLoaded", () => resolve())
-    //  }
-    //})
-    const documentReady = Promise.resolve()
-
     this.cmresolve = () => {}
     this.codemirror = new Promise((resolve, _) => {
       this.cmresolve = resolve
@@ -136,48 +130,19 @@ class Session {
   }
 }
 
-function assert(cond: boolean) {
-  if (!cond) {
-    throw new Error("Assertion failed")
-  }
-}
-
-export async function takeover() {
-
-  document.title = "my-awesome-tempate"
+export async function takeover(documentName: string) {
 
   const doc = new DOMParser().parseFromString(html, "text/html")
   document.body.replaceChildren(...doc.body.children)
 
-  const saveBtn: HTMLButtonElement = (function () {
-    const e = document.querySelector("button#save-btn")
-    assert(e instanceof HTMLButtonElement)
-    return e as HTMLButtonElement
-  })()
-
-  const saveAsBtn: HTMLButtonElement = (function () {
-    const e = document.querySelector("button#save-as-btn")
-    assert(e instanceof HTMLButtonElement)
-    return e as HTMLButtonElement
-  })()
-
   // See https://github.com/remix-run/history/issues/503
+  const newUrl = new URL(window.location.toString())
+  newUrl.hash = "#form"
+  window.history.replaceState({}, "", newUrl)
   window.location.hash = "#form"
-
-  const typstSource: string =
-        window.localStorage.getItem(["templates", "my-awesome-template"].toString())
-        ?? placeholderTypstSource
 
   const session = new Session()
 
-  saveBtn.addEventListener("click", async () => {
-    window.localStorage.setItem(
-      ["templates", "my-awesome-template"].toString(),
-      await getCurrentSource(session)
-    )
-  })
-
-  // Assign elements to session using the same pattern as saveBtn
   const editorElem: HTMLElement = (function () {
     const e = document.querySelector("#editor-div")
     assert(e instanceof HTMLElement)
@@ -202,11 +167,119 @@ export async function takeover() {
     return e as HTMLButtonElement
   })()
 
+  const saveBtn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#save-btn")
+    assert(e instanceof HTMLButtonElement)
+    return e as HTMLButtonElement
+  })()
+
+  const saveAsBtn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#save-as-btn")
+    assert(e instanceof HTMLButtonElement)
+    return e as HTMLButtonElement
+  })()
+
+  const downloadBtn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#download-btn")
+    assert(e instanceof HTMLButtonElement)
+    return e as HTMLButtonElement
+  })()
+
   const preview: HTMLElement = (function () {
     const e = document.querySelector("#preview")
     assert(e instanceof HTMLElement)
     return e as HTMLElement
   })()
+
+  const documentNameElem: HTMLElement = (function () {
+    const e = document.querySelector("#document-name")
+    assert(e instanceof HTMLElement)
+    return e as HTMLElement
+  })()
+
+  const errorMessageContainer: HTMLElement = (function () {
+    const e = document.querySelector("#error-message-container")
+    assert(e instanceof HTMLElement)
+    return e as HTMLElement
+  })()
+
+  const documentNameS = new Signal(documentName)
+
+  const [typstSource, isNew]: [string, boolean] = (function () {
+    const doc = ls.getTemplateDocument(documentNameS.getValue())
+    if (doc === null) {
+      return [placeholderTypstSource, true]
+    }
+    return [doc.typstSource, false]
+  })()
+
+  const isSavedS = new Signal(isNew ? false : true)
+  const documentDisplayNameS: Signal<string> = Signal.map2(
+    documentNameS,
+    isSavedS,
+    (name, isSaved) => {
+      return (name + (isSaved ? "" : "*"))
+    }
+  )
+
+  documentDisplayNameS.listen(s => {
+    documentNameElem.innerHTML = s
+    document.title = s
+  })
+  documentNameS.listen(s => {
+    router.pushStateCosmetic({}, `/templates/${s}` + window.location.hash)
+  })
+
+  documentNameS.triggerUpdate()
+
+  saveBtn.addEventListener("click", async () => {
+    isSavedS.setValue(true)
+    ls.setTemplateDocument({
+      name: documentNameS.getValue(),
+      typstSource: await getCurrentSource(session),
+    })
+  })
+
+  saveAsBtn.addEventListener("click", async () => {
+    const ans = prompt("Under what name do you want to save the template?")
+    if (ans === null) {
+      return
+    }
+    ls.setTemplateDocument({
+      name: ans,
+      typstSource: await getCurrentSource(session),
+    })
+    documentNameS.setValue(ans)
+    isSavedS.setValue(true)
+  })
+
+  downloadBtn.addEventListener("click", async () => {
+    const compiler = await (await session.getNewCompilerBuilder()).build()
+    compiler.add_source("/main.typ", await getCurrentSource(session))
+    compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
+    const fieldElems = [...fieldsElem.children]
+    const fieldValues: Record<string, string> = {}
+    for (const elem of fieldElems) {
+      console.log(elem)
+      const st = elem as ShortText
+      fieldValues[st.label] = st.value
+    }
+  console.log(`#let json = "${JSON.stringify(fieldValues)}"`)
+  compiler.add_source(
+    "/pdf-template-field-inputs.json",
+    JSON.stringify(fieldValues)
+  )
+    const pdf = compiler.compile("/main.typ", null, "pdf", 0)
+    const blob = new Blob([pdf], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = documentNameS.getValue() + '.pdf'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  })
 
   // Create the editor
   const shadow = editorElem.attachShadow({ mode: "open" })
@@ -216,6 +289,7 @@ export async function takeover() {
       basicSetup,
     ],
   });
+
   const view = new EditorView({
     state,
     parent: shadow,
@@ -223,27 +297,144 @@ export async function takeover() {
   });
   session.setCodeMirrorInstance(view)
 
-  // Determine which fields are expected
-  updateFields(session, fieldsElem)
+  // A signal that is triggered whenever the code is changed.
+  // The number is incremented on every change, for bookeåing purpouses only,
+  // so that `debounce` works as desired.
+  const codeEditS = new Signal<number>(0)
+  view.dom.addEventListener("input", () => {
+    codeEditS.setValue(codeEditS.getValue() + 1)
+  })
 
-  // Whenever the "Render" tab is active (i.e. URL fragment is #form), we should upd
-  window.addEventListener("hashchange", async () => {
-    if (window.location.hash === "#form") {
-      try {
-        await updateFields(session, fieldsElem)
-      } catch (e) {
-        // Is it an expected syntax/etc in the typst code?
-        if (!(e as Error).toString().startsWith("[SourceDiagnostic")) {
-          throw e
+  // Whenever code is changed, the document is no longer saved.
+  codeEditS.listen(() => isSavedS.setValue(false))
+
+  const fieldsS = new Signal<Field[]>([])
+
+  const compiler = await (await session.getNewCompilerBuilder()).build()
+  compiler.add_source("/main.typ", await getCurrentSource(session))
+  compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
+  compiler.add_source("/pdf-template-field-inputs.json", "{}")
+  const incrCompiler = compiler.create_incr_server()
+  const compilationStatusS: Signal<"success" | { severity: string, message: string }> =
+    codeEditS.debounce(500).map(() => {
+      compiler.add_source("/main.typ", view.state.doc.toString())
+
+    try {
+      const query = compiler.query("/main.typ", null, "<pdf-template-field>", null)
+      const fields: Field[] = (function () {
+        const validated = v.validatingParse(typstFieldQueryParser, query)
+        if (typeof validated === "undefined") {
+          throw new Error("Invalid query result", JSON.parse(query))
         }
-        console.log(e)
+        return validated.map(e => e.value)
+      })()
+      console.log("ASDDSA")
+      fieldsS.setValue(fields)
+      return "success"
+    } catch (e) {
+      // Is it a typst compiler error? (The errors are strings it's wierd..)
+      if (typeof e === "string" && e.startsWith("[SourceDiagnostic { ")) {
+        // Parse error string like: [SourceDiagnostic { severity: Error, span: Span(344260882076035), message: "unknown variable: worldd", trace: [], hints: [] }]
+        const match = e.match(/\[SourceDiagnostic \{ severity: (\w+), span: Span\((\d+)\), message: "(.*?)", trace: \[(.*?)\], hints: \[(.*?)\] \}\]/)
+        if (match) {
+          const [_, severity, span, message, trace, hints] = match
+          const diagnostic = {
+            severity: severity as string,
+            span: parseInt(span as string),
+            message: message as string,
+            trace: trace ? trace.split(",").map(s => s.trim()) : [],
+            hints: hints ? hints.split(",").map(s => s.trim()) : []
+          }
+          return {
+            severity: diagnostic.severity,
+            message: diagnostic.message,
+          }
+        }
+        console.log("Unable to parse error")
+        throw e
       }
+      throw e
     }
   })
 
-  const cb = renderCallback.bind(null, session, preview, fieldsElem)
-  update1Btn.addEventListener("click", cb)
-  update2Btn.addEventListener("click", cb)
+  fieldsS.listen(fields => {
+    console.log("here", fields)
+    const elements: Node[] = fields.map(field => {
+      const elem = document.createElement("m-short-text")
+      elem.setAttribute("id",`typst-input-${field.name}`)
+      elem.setAttribute("label", field.name)
+      elem.setAttribute("placeholder", field.default ?? "")
+      elem.innerHTML = field.name
+      return elem
+    })
+    fieldsElem.replaceChildren(...elements)
+  })
+
+  compilationStatusS.listen(async (v) => {
+    if (v === "success") {
+      preview.style.display = ""
+      errorMessageContainer.style.display = "none"
+
+      // Get the values of the fields
+      const fieldElems = [...fieldsElem.children]
+      const fieldValues: Record<string, string> = {}
+      for (const elem of fieldElems) {
+        const st = elem as ShortText
+        fieldValues[st.label] = st.value
+      }
+      compiler.add_source(
+        "/pdf-template-field-inputs.json",
+        JSON.stringify(fieldValues)
+      )
+
+      compiler.incr_compile("/main.typ", null, incrCompiler, 0)
+
+      const artifact = compiler.get_artifact("vector", 0)
+      if (typeof artifact === "undefined") {
+        throw new Error("Unreachable")
+      }
+
+      const sessionOptions = new r.CreateSessionOptions()
+      sessionOptions.format = "vector"
+      sessionOptions.artifact_content = artifact
+      const renderer = await session.getRenderer()
+      const rsession = renderer.create_session(sessionOptions)
+
+      // Why try-catch? See:
+      // https://github.com/Myriad-Dreamin/typst.ts/issues/737
+      try {
+        renderer.render_svg(rsession, preview)
+      } catch (e) {
+        if ((e as Error).message !== "unreachable executed") {
+          throw e
+        }
+      }
+
+      return
+    }
+
+    // Failure
+    errorMessageContainer.innerHTML = `
+    <m-col class="gap-4 grow h-full items-center justify-center">
+      <p class="text-lg">❗ ${v.severity} ❗</p>
+      <p class="text-md">${v.message}</p>
+    </m-col>
+    `
+    preview.style.display = "none"
+    errorMessageContainer.style.display = ""
+  })
+
+  fieldsS.triggerUpdate()  // TODO: This sould not be necessary?
+                           // `compilationStatus.truggerUpdate()` should also
+                           // trigger `fieldsS`
+  compilationStatusS.triggerUpdate()
+
+  // Have user confirm before leaving unsaved changes
+  router.addBeforeNavigateCallback(() => {
+    if(!isSavedS.getValue()) {
+      return "You have unsaved changes! Do you want to leave this page and discard them?"
+    }
+  })
 }
 
 async function getFields(session: Session, typstSource: string): Promise<Field[]> {
@@ -268,92 +459,4 @@ async function getFields(session: Session, typstSource: string): Promise<Field[]
 
 async function getCurrentSource(session: Session): Promise<string> {
   return (await session.codemirror).state.doc.toString()
-}
-
-async function updateFields(session: Session, fieldsElem: HTMLElement) {
-  const fields = await getFields(session, await getCurrentSource(session))
-  const elements: Node[] = fields.map(field => {
-    const elem = document.createElement("m-short-text")
-    elem.setAttribute("id",`typst-input-${field.name}`)
-    elem.setAttribute("label", field.name)
-    elem.setAttribute("placeholder", field.default ?? "")
-    elem.innerHTML = field.name
-    return elem
-  })
-
-  fieldsElem.replaceChildren(...elements)
-}
-
-async function renderCallback(
-  s: Session,
-  renderTarget: HTMLElement,
-  fieldsElem: HTMLElement,
-  _: Event): Promise<void>
-{
-  const cbuilder = await s.getNewCompilerBuilder()
-  await cbuilder.set_package_registry(null, function(...args: any[]) {
-    console.log("args", ...args)
-    return undefined
-  })
-  const compiler = await cbuilder.build()
-
-  const source = await getCurrentSource(s)
-  compiler.add_source("/main.typ", source)
-  compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
-
-  // Get the values of the fields
-  const fieldElems = [...fieldsElem.children]
-  const fieldValues: Record<string, string> = {}
-  for (const elem of fieldElems) {
-    console.log(elem)
-    const st = elem as ShortText
-    fieldValues[st.label] = st.value
-  }
-  console.log(fieldValues)
-  console.log(`#let json = "${JSON.stringify(fieldValues)}"`)
-  compiler.add_source(
-    "/pdf-template-field-inputs.json",
-    JSON.stringify(fieldValues)
-  )
-
-  const artifact = compiler.compile("/main.typ", null, "vector", 0)
-
-  const sessionOptions = new r.CreateSessionOptions()
-  sessionOptions.format = "vector"
-  sessionOptions.artifact_content = artifact
-  const renderer = await s.getRenderer()
-  const rsession = renderer.create_session(sessionOptions)
-
-  // Why try-catch? See:
-  // https://github.com/Myriad-Dreamin/typst.ts/issues/737
-  try {
-    renderer.render_svg(rsession, renderTarget)
-  } catch (e) {
-    if ((e as Error).message !== "unreachable executed") {
-      throw e
-    }
-
-  }
-}
-
-// https://stackoverflow.com/a/61511955
-function waitForElem(selector: string): Promise<Element> {
-    return new Promise(resolve => {
-        if (document.querySelector(selector)) {
-            return resolve(document.querySelector(selector)!);
-        }
-
-        const observer = new MutationObserver(mutations => {
-            if (document.querySelector(selector)) {
-                observer.disconnect();
-                resolve(document.querySelector(selector)!);
-            }
-        });
-
-        // If you get "parameter 1 is not of type 'Node'" error, see https://stackoverflow.com/a/77855838/492336
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    });
 }

@@ -5,7 +5,7 @@
     <div>&gt;</div>
     <m-route href="/templates">templates</m-route>
     <div>&gt;</div>
-    <a>MyAwesomeTemplate</a>
+    <p id="document-name"></p>
   </m-row>
 
   <!-- Body -->
@@ -36,7 +36,7 @@
         <!-- Action Buttons -->
         <m-row class="gap-2">
           <button id="update-btn1" class="border px-4 py-2 rounded hover:bg-gray-200">Update</button>
-          <button class="border px-4 py-2 rounded hover:bg-gray-200">Download</button>
+          <button id="download-btn" class="border px-4 py-2 rounded hover:bg-gray-200">Download</button>
         </m-row>
       </m-col>
 
@@ -55,6 +55,7 @@
     <!-- Preview -->
     <m-col class="grow overflow-x-auto bg-white shadow rounded">
       <div id="preview" class="grow shrink basis-0 overflow-y-auto"></div>
+      <div id="error-message-container" style="display: none" class="w-full h-full bg-gray-200"
     </m-col>
   </m-row>
 </m-col>

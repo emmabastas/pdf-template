@@ -1,3 +1,8 @@
+import type { TemplateDocument } from "./parsers"
+import { parseHTML, assert } from "./utils"
+import * as utils from "./utils"
+import * as ls from "./localstorage"
+
 export class Col extends HTMLElement {
   constructor() {
     super()
@@ -123,12 +128,263 @@ export class ShortText extends HTMLElement {
   }
 }
 
+export class TemplateItem extends HTMLElement {
+  private static template = parseHTML(`
+<m-row class="gap-8 justify-between">
+  <m-route class="text-lg"></m-route>
+  <m-row class="gap-2">
+    <button class="rounded hover:bg-gray-200">
+        <m-icon-rename alt-text="Rename"/>
+    </button>
+    <button class="rounded hover:bg-gray-200">
+        <m-icon-duplicate alt-text="Duplicate"/>
+    </button>
+    <button class="rounded hover:bg-gray-200">
+        <m-icon-download alt-text="Download"/>
+    </button>
+    <button class="rounded hover:bg-gray-200">
+        <m-icon-trash alt-text="Delete"/>
+    </button>
+  </m-row>
+</m-row>`)
+
+  private root: HTMLElement
+  private route: Route
+  private renameButton: HTMLElement
+  private downloadButton: HTMLButtonElement
+  private duplicateButton: HTMLButtonElement
+  private deleteButton: HTMLButtonElement
+
+  constructor() {
+    super()
+
+    this.root = document.importNode(TemplateItem.template, true)
+    this.route = this.root.getElementsByTagName("m-route")[0]! as Route
+
+    const [
+      renameButton,
+      duplicateButton,
+      downloadButton,
+      deleteButton
+    ] = (this.root.getElementsByTagName("button") as unknown) as HTMLButtonElement[]
+
+    this.renameButton = renameButton!
+    this.duplicateButton = duplicateButton!
+    this.downloadButton = downloadButton!
+    this.deleteButton = deleteButton!
+  }
+
+  connectedCallback() {
+    this.replaceChildren(this.root)
+  }
+
+  set templateDocument(templateDocument: TemplateDocument) {
+    this.route.innerHTML = templateDocument.name
+    this.route.setAttribute("href", `/templates/${templateDocument.name}`)
+
+    this.renameButton.addEventListener("click", () => {
+      const ans = prompt("Rename to what?")
+      if (ans === null) {
+        return
+      }
+      this.dispatchEvent(new CustomEvent("rename", {
+        bubbles: true,
+        composed: true,
+        detail: {
+          newName: ans,
+        }
+      }))
+    })
+
+    this.duplicateButton.addEventListener("click", () => {
+      this.dispatchEvent(new CustomEvent("duplicate", {
+        bubbles: true,
+        composed: true,
+      }))
+    })
+
+    this.downloadButton.addEventListener("click", () => {
+      const blob = new Blob([templateDocument.typstSource], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${templateDocument.name}.typ`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+
+    this.deleteButton.addEventListener("click", () => {
+      this.dispatchEvent(new CustomEvent("delete", {
+        bubbles: true,
+        composed: true,
+      }))
+    })
+  }
+}
+
+export class SVGIcon extends HTMLElement {
+  private svg: SVGElement
+  private static tooltipTemplate = parseHTML(`
+  <span role="tooltip" style="opacity: 0; transition-delay: 900ms" class="hidden absolute group-hover:flex -top-2 -translate-y-full px-2 py-1 bg-gray-700 rounded-lg text-center text-white text-sm transition-opacity">
+</span>
+`)
+
+  constructor(svg_: SVGElement | string) {
+    const svg = (function() {
+      if (typeof svg_ === "string") {
+        const doc = (new DOMParser ())
+          .parseFromString(svg_, "image/svg+xml");
+        assert(doc.documentElement instanceof SVGElement)
+        return (doc.documentElement as unknown) as SVGElement
+
+      }
+      return svg_
+    })()
+
+    super()
+    this.svg = svg
+  }
+
+  static get observedAttributes() {
+    return ['alt-text', 'decorative'];
+  }
+
+  connectedCallback() {
+    const altText = this.getAttribute("alt-text")
+    const decorative = this.hasAttribute("decorative")
+
+    if (altText !== null) {
+      const title = document.createElement("title")
+      title.innerHTML = altText
+      this.svg.appendChild(title)
+    }
+
+    if (decorative) {
+      this.svg.setAttribute("aria-hidden", "true")
+    } else {
+      this.svg.setAttribute("role", "img")
+    }
+
+    if (!decorative && altText !== null) {
+      const tooltip = document.importNode(SVGIcon.tooltipTemplate, true)
+      tooltip.innerHTML = altText
+      this.classList.add("relative")
+      this.appendChild(tooltip)
+      this.addEventListener("mouseover", () => {
+        tooltip.classList.remove("hidden")
+        setTimeout(() => tooltip.style.opacity = "1", 0)
+      })
+      this.addEventListener("mouseleave", () => {
+        tooltip.classList.add("hidden")
+        tooltip.style.opacity = "0"
+      })
+      tooltip.style.left = `-${tooltip.getBoundingClientRect().width / 2}px`
+    }
+
+    this.appendChild(this.svg)
+  }
+}
+
+// https://css.gg/icon/trash
+export class IconTrash extends SVGIcon {
+  constructor() {
+    super(`<svg
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <path
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    d="M17 5V4C17 2.89543 16.1046 2 15 2H9C7.89543 2 7 2.89543 7 4V5H4C3.44772 5 3 5.44772 3 6C3 6.55228 3.44772 7 4 7H5V18C5 19.6569 6.34315 21 8 21H16C17.6569 21 19 19.6569 19 18V7H20C20.5523 7 21 6.55228 21 6C21 5.44772 20.5523 5 20 5H17ZM15 4H9V5H15V4ZM17 7H7V18C7 18.5523 7.44772 19 8 19H16C16.5523 19 17 18.5523 17 18V7Z"
+    fill="currentColor"
+  />
+  <path d="M9 9H11V17H9V9Z" fill="currentColor" />
+  <path d="M13 9H15V17H13V9Z" fill="currentColor" />
+</svg>`)
+  }
+}
+
+// https://css.gg/icon/rename
+export class IconRename extends SVGIcon {
+  constructor() {
+    super(`<svg
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <path
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    d="M10 4H8V6H5C3.34315 6 2 7.34315 2 9V15C2 16.6569 3.34315 18 5 18H8V20H10V4ZM8 8V16H5C4.44772 16 4 15.5523 4 15V9C4 8.44772 4.44772 8 5 8H8Z"
+    fill="currentColor"
+  />
+  <path
+    d="M19 16H12V18H19C20.6569 18 22 16.6569 22 15V9C22 7.34315 20.6569 6 19 6H12V8H19C19.5523 8 20 8.44771 20 9V15C20 15.5523 19.5523 16 19 16Z"
+    fill="currentColor"
+  />
+</svg>`)
+  }
+}
+
+// https://css.gg/icon/duplicate
+export class IconDuplicate extends SVGIcon {
+  constructor() {
+    super(`<svg
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <path d="M19 5H7V3H21V17H19V5Z" fill="currentColor" />
+  <path d="M9 13V11H11V13H13V15H11V17H9V15H7V13H9Z" fill="currentColor" />
+  <path
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    d="M3 7H17V21H3V7ZM5 9H15V19H5V9Z"
+    fill="currentColor"
+  />
+</svg>`)
+  }
+}
+
+// https://css.gg/icon/push-down
+export class IconDownload extends SVGIcon {
+  constructor() {
+    super(`<svg
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <path
+    d="M11.0001 1H13.0001V15.4853L16.2428 12.2427L17.657 13.6569L12.0001 19.3137L6.34326 13.6569L7.75748 12.2427L11.0001 15.4853V1Z"
+    fill="currentColor"
+  />
+  <path d="M18 20.2877H6V22.2877H18V20.2877Z" fill="currentColor" />
+</svg>`)
+  }
+}
+
 let registerd = false
 function register() {
   customElements.define('m-row', Row);
   customElements.define('m-col', Col);
   customElements.define('m-route', Route);
   customElements.define('m-short-text', ShortText);
+  customElements.define('m-template-item', TemplateItem);
+  customElements.define("m-icon-trash", IconTrash)
+  customElements.define("m-icon-rename", IconRename)
+  customElements.define("m-icon-duplicate", IconDuplicate)
+  customElements.define("m-icon-download", IconDownload)
 }
 if (registerd === false) {
   registerd = true

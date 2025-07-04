@@ -1,4 +1,16 @@
-<m-col class="h-full w-full justify-center items-center gap-4">
-  <p>TEMPLATES</p>
-  <m-route href="/templates/my-awesome-template">My Awesome Template</m-route>
+<m-col class="h-full w-full">
+  <!-- Header -->
+  <m-row class="gap-4 font-bold p-6">
+    <m-route href="/">pdf-template</m-route>
+    <div>&gt;</div>
+    <m-route href="/templates">templates</m-route>
+  </m-row>
+  <m-row class="justify-center p-6">
+    <m-col id="template-list" class="gap-4"></m-col>
+  </m-row>
+  <m-row class="justify-center">
+    <button id="new-btn" class="px-4 py-2 rounded border hover:bg-gray-200">
+      New
+    </button>
+  </m-row>
 </m-col>

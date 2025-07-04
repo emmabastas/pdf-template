@@ -7,6 +7,10 @@ window.addEventListener('popstate', () => {
   callback();
 });
 
+// TODO deprecate window.history.pushState/replaceState
+// for custom functions exported from router.ts
+// make original push/popState throw an error
+
 // Create a custom event for pushState/replaceState
 const originalPushState = window.history.pushState;
 const originalReplaceState = window.history.replaceState;
@@ -21,6 +25,17 @@ window.history.replaceState = function(...args) {
   callback();
 };
 
+export function pushStateCosmetic(data: any, url: string | URL) {
+  originalPushState.apply(window.history, [data, "", url])
+}
+
+type BeforeNavigateCallback = (target: Location) => void | string
+let beforeNavigateCallbacks: BeforeNavigateCallback[] = []
+
+export function addBeforeNavigateCallback(cb: BeforeNavigateCallback) {
+  beforeNavigateCallbacks.push(cb)
+}
+
 let prevOrigin : string | null = null
 let prevPathname : string | null = null
 function callback() {
@@ -28,23 +43,42 @@ function callback() {
     && window.location.pathname == prevPathname) {
       return
   }
+
+  for (const cb of beforeNavigateCallbacks) {
+    const ret = cb(window.location)
+    if (typeof ret === "string") {
+
+      const ans = confirm(ret)
+      if (ans === false) {
+        return // We asked the user if they really wanted to navigate away
+               // and they said no.
+      }
+    }
+  }
+  beforeNavigateCallbacks = []
+
   prevOrigin = window.location.origin
   prevPathname = window.location.pathname
 
   let path = window.location.pathname.split("/").filter(e => e !== "")
-  console.log(path)
 
   if (path.length === 0) {
     landing.takeover()
+    return
   }
 
   if (path.length === 1 && path[0] === "templates") {
     templates.takeover()
+    return
   }
 
   if (path.length === 2 && path[0] == "templates") {
-    templatesTemplate.takeover()
+    const isNew = new URLSearchParams(window.location.search).get("new") !== null
+    templatesTemplate.takeover(path[1]!, isNew)
+    return
   }
+
+  throw new Error("TODO 404")
 }
 
 if (document.readyState === "complete") {
