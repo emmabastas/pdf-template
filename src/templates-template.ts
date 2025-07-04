@@ -9,6 +9,7 @@ import { EditorState } from "@codemirror/state"
 import * as ls from "./localstorage"
 import * as router from "./router"
 import { just, nothing, assert, Signal } from "./utils"
+import * as utils from "./utils"
 
 //@ts-ignore
 import html from "bundle-text:./templates-template.html"
@@ -155,14 +156,8 @@ export async function takeover(documentName: string) {
     return e as HTMLElement
   })()
 
-  const update1Btn: HTMLButtonElement = (function () {
-    const e = document.querySelector("button#update-btn1")
-    assert(e instanceof HTMLButtonElement)
-    return e as HTMLButtonElement
-  })()
-
-  const update2Btn: HTMLButtonElement = (function () {
-    const e = document.querySelector("button#update-btn2")
+  const updateBtn: HTMLButtonElement = (function () {
+    const e = document.querySelector("button#update-btn")
     assert(e instanceof HTMLButtonElement)
     return e as HTMLButtonElement
   })()
@@ -281,12 +276,20 @@ export async function takeover(documentName: string) {
     URL.revokeObjectURL(url)
   })
 
+  // A signal that is triggered whenever the code is changed.
+  // The number is incremented on every change, for bookeåing purpouses only,
+  // so that `debounce` works as desired.
+  const codeEditS = new Signal<number>(0)
+
   // Create the editor
   const shadow = editorElem.attachShadow({ mode: "open" })
   const state = EditorState.create({
     doc: typstSource,
     extensions: [
       basicSetup,
+      EditorView.updateListener.of(() => {
+        codeEditS.setValue(codeEditS.getValue() + 1)
+      })
     ],
   });
 
@@ -296,14 +299,6 @@ export async function takeover(documentName: string) {
     root: shadow,
   });
   session.setCodeMirrorInstance(view)
-
-  // A signal that is triggered whenever the code is changed.
-  // The number is incremented on every change, for bookeåing purpouses only,
-  // so that `debounce` works as desired.
-  const codeEditS = new Signal<number>(0)
-  view.dom.addEventListener("input", () => {
-    codeEditS.setValue(codeEditS.getValue() + 1)
-  })
 
   // Whenever code is changed, the document is no longer saved.
   codeEditS.listen(() => isSavedS.setValue(false))
@@ -373,8 +368,7 @@ export async function takeover(documentName: string) {
     }
   })
 
-  fieldsS.listen(fields => {
-    console.log("here", fields)
+  fieldsS.dedupe(utils.compare).listen(fields => {
     const elements: Node[] = fields.map(field => {
       const elem = document.createElement("m-short-text")
       elem.setAttribute("id",`typst-input-${field.name}`)
