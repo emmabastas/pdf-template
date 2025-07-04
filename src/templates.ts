@@ -1,5 +1,5 @@
 //@ts-ignore
-import html from "bundle-text:./templates.html"
+import html from "bundle-text:./templates-body.html"
 import * as ls from "./localstorage"
 import type { TemplateDocument } from "./parsers"
 import type { TemplateItem } from "./components"

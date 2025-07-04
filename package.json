@@ -1,8 +1,9 @@
 {
   "source": "src/index.html",
   "scripts": {
-    "serve": "parcel serve src/index.html",
-    "publish": "rm -r ./dist && npx parcel build --no-content-hash ./src/index.html --no-scope-hoist && cp ./dist/index.html ./dist/200.html && surge ./dist pdf-template.surge.sh"
+      "watch": "parcel watch ./src/**/*.html ./src/**/*.ts ./src/**/*.css ./src/**/*.svg",
+    "dev-server": "node server.js",
+    "publish": "rm -r ./dist && npx parcel build ./src/200.html ./src/index.html ./src/templates.html ./src/about.html --no-scope-hoist && surge ./dist pdf-template.surge.sh"
   },
   "devDependencies": {
     "@codemirror/commands": "^6.8.1",
@@ -14,6 +15,7 @@
     "@tailwindcss/postcss": "^4.1.11",
     "codemirror": "^6.0.2",
     "parcel": "^2.15.2",
+    "posthtml-include": "^2.0.1",
     "surge": "^0.24.6",
     "tailwindcss": "^4.1.11",
     "ts-json-validator": "git+ssh://git@github.com:nwtgck/ts-json-validator.git#3b2ce85",

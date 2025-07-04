@@ -14,17 +14,6 @@
             packages = with pkgs; [
               nodejs
               nodePackages."typescript-language-server"
-
-              # Python for http server `python3 -m http.server`
-              (pkgs.python3.withPackages (python-pkgs: with python-pkgs; [
-                # lsp related (uncomment if you want it)
-                #python-lsp-server
-                #rope # autocomplete
-                #pyflakes # syntax checking
-                #pycodestyle # style linting
-                #pylsp-mypy # type checking
-                #future # solves https://github.com/tomv564/pyls-mypy/issues/37
-              ]))
             ];
             shellHook = ''
               export PATH="$PWD/node_modules/.bin/:$PATH"

@@ -1,7 +1,6 @@
 //@ts-ignore
-import html from "bundle-text:./about.html"
+import html from "bundle-text:./about-body.html"
 
 export function takeover() {
-  document.title = "pdf-template"
   document.body.innerHTML = html
 }

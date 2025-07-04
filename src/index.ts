@@ -1,5 +1,5 @@
 //@ts-ignore
-import html from "bundle-text:./landing.html"
+import html from "bundle-text:./index-body.html"
 
 export function takeover() {
   document.title = "pdf-template"

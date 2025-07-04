@@ -1,4 +1,4 @@
-import * as landing from "./landing"
+import * as index from "./index"
 import * as templates from "./templates"
 import * as templatesTemplate from "./templates-template"
 import * as about from "./about"
@@ -65,7 +65,7 @@ function callback() {
   let path = decodeURI(window.location.pathname).split("/").filter(e => e !== "")
 
   if (path.length === 0) {
-    landing.takeover()
+    index.takeover()
     return
   }
 

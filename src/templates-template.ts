@@ -13,7 +13,7 @@ import { EditorView, basicSetup } from "codemirror"
 import { EditorState } from "@codemirror/state"
 
 //@ts-ignore
-import html from "bundle-text:./templates-template.html"
+import html from "bundle-text:./templates-template-body.html"
 
 //@ts-ignore
 import pdfTemplateTypstSource from "bundle-text:./pdf-template.typ"
