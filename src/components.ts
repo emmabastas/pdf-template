@@ -65,17 +65,42 @@ export class Divider extends HTMLElement {
           height: 100%;
           flex: 1;
           min-width: 0;
-          overflow: hidden;
+          overflow: auto;
         }
         .divider {
           width: 4px;
-          margin-left: 8px;
-          margin-right: 8px;
+          margin-left: 15px;
           background: #e5e7eb;
           cursor: col-resize;
           transition: background-color 0.2s;
+          position: relative;
         }
         .divider:hover, .divider.dragging {
+          background: #9ca3af;
+        }
+        .divider-handle {
+          position: absolute;
+          left: -8px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 20px;
+          height: 40px;
+          background: #e5e7eb;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: col-resize;
+          transition: background-color 0.2s;
+        }
+        .divider-handle::after {
+          content: "⋮";
+          color: #6b7280;
+          font-size: 20px;
+          line-height: 1;
+        }
+        .divider:hover .divider-handle,
+        .divider.dragging .divider-handle {
           background: #9ca3af;
         }
       </style>
@@ -83,7 +108,9 @@ export class Divider extends HTMLElement {
         <div class="first-container">
           <slot name="left"></slot>
         </div>
-        <div class="divider"></div>
+        <div class="divider">
+          <div class="divider-handle"></div>
+        </div>
         <div class="second-container">
           <slot name="right"></slot>
         </div>

@@ -1,15 +1,16 @@
-import * as c from "@myriaddreamin/typst-ts-web-compiler"
-import * as r from "@myriaddreamin/typst-ts-renderer"
+import { session } from "./session"
 import { ShortTextField, LongTextField, NumberField } from "./components"
-import * as v from "ts-json-validator"
 import { typstFieldQueryParser } from "./parsers"
 import type { Field } from "./parsers"
-import { EditorView, basicSetup } from "codemirror"
-import { EditorState } from "@codemirror/state"
+import { just, nothing, assert, Signal } from "./utils"
+import * as utils from "./utils"
 import * as ls from "./localstorage"
 import * as router from "./router"
-import { just, nothing, assert, assertNever, Signal } from "./utils"
-import * as utils from "./utils"
+
+import * as r from "@myriaddreamin/typst-ts-renderer"
+import * as v from "ts-json-validator"
+import { EditorView, basicSetup } from "codemirror"
+import { EditorState } from "@codemirror/state"
 
 //@ts-ignore
 import html from "bundle-text:./templates-template.html"
@@ -19,7 +20,6 @@ import pdfTemplateTypstSource from "bundle-text:./pdf-template.typ"
 
 //@ts-ignore
 import placeholderTypstSource from "bundle-text:./placeholder.typ"
-import type { EditorViewConfig } from "@codemirror/view"
 
 interface TypstPackageRequest {
   name: string;
@@ -27,109 +27,6 @@ interface TypstPackageRequest {
   version: string;
 }
 type PackageResolver = (req: TypstPackageRequest) => Promise<Uint8Array|null>
-
-const textFonts = [
-    'DejaVuSansMono-Bold.ttf',
-    'DejaVuSansMono-BoldOblique.ttf',
-    'DejaVuSansMono-Oblique.ttf',
-    'DejaVuSansMono.ttf',
-    'LibertinusSerif-Bold.otf',
-    'LibertinusSerif-BoldItalic.otf',
-    'LibertinusSerif-Italic.otf',
-    'LibertinusSerif-Regular.otf',
-    'LibertinusSerif-Semibold.otf',
-    'LibertinusSerif-SemiboldItalic.otf',
-    'NewCM10-Bold.otf',
-    'NewCM10-BoldItalic.otf',
-    'NewCM10-Italic.otf',
-    'NewCM10-Regular.otf',
-    'NewCMMath-Bold.otf',
-    'NewCMMath-Book.otf',
-    'NewCMMath-Regular.otf',
-];
-const textFontsPrefix = "https://cdn.jsdelivr.net/gh/typst/typst-assets@v0.13.1/files/fonts/"
-
-// This class is in charge of loading all the async data we need in as
-// nonblocking a maner as feasible.
-class Session {
-  public codemirror: Promise<EditorView>
-  private cmresolve: (_: EditorView) => void
-
-  private renderer: Promise<r.TypstRenderer>
-  private fontData: Promise<Uint8Array<ArrayBufferLike>[]>
-  private cInitialized: Promise<void>
-  private rInitialized: Promise<void>
-  private dummyCompiler: Promise<c.TypstCompiler>
-
-  constructor() {
-    const cwasmp: Promise<WebAssembly.Module> = WebAssembly.compileStreaming(
-      fetch(new URL("../node_modules/@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm", import.meta.url))
-    )
-
-    const rwasmp: Promise<WebAssembly.Module> = WebAssembly.compileStreaming(
-      fetch(new URL("../node_modules/@myriaddreamin/typst-ts-renderer/pkg/typst_ts_renderer_bg.wasm", import.meta.url))
-    )
-
-    this.cInitialized = cwasmp.then(cwasm => {
-      const _ = c.initSync({ module: cwasm, })
-    })
-
-    this.rInitialized = rwasmp.then(rwasm => {
-      const _ = r.initSync({ module: rwasm, })
-    })
-
-    this.fontData = Promise.all(
-      textFonts.map(async textFont => {
-        const resp = await fetch(new URL(textFontsPrefix + textFont))
-        const bytes = await resp.bytes()
-        return bytes
-      })
-    )
-
-    this.renderer = this.rInitialized.then(async () => {
-      const rbuilder = new r.TypstRendererBuilder()
-      const renderer = await rbuilder.build()
-      return renderer
-    })
-
-    this.dummyCompiler = this.cInitialized.then(async () => {
-      const builder = new c.TypstCompilerBuilder()
-      for (const data of await this.fontData) {
-        await builder.add_raw_font(data)
-      }
-      const compiler = await builder.build()
-      compiler.add_source("/pdf-template-field-inputs.json", "{}")
-      return compiler
-    })
-
-    this.cmresolve = () => {}
-    this.codemirror = new Promise((resolve, _) => {
-      this.cmresolve = resolve
-    })
-  }
-
-  async getRenderer(): Promise<r.TypstRenderer> {
-    return this.renderer
-  }
-
-  async getDummyCompiler(): Promise<c.TypstCompiler> {
-    return this.dummyCompiler
-  }
-
-  async getNewCompilerBuilder(): Promise<c.TypstCompilerBuilder> {
-
-    await this.cInitialized
-    const builder = new c.TypstCompilerBuilder()
-    for (const data of await this.fontData) {
-      await builder.add_raw_font(data)
-    }
-    return builder
-  }
-
-  setCodeMirrorInstance(view: EditorView) {
-    this.cmresolve(view)
-  }
-}
 
 export async function takeover(documentName: string) {
 
@@ -141,8 +38,6 @@ export async function takeover(documentName: string) {
   newUrl.hash = "#form"
   window.history.replaceState({}, "", newUrl)
   window.location.hash = "#form"
-
-  const session = new Session()
 
   const editorElem: HTMLElement = (function () {
     const e = document.querySelector("#editor-div")
@@ -231,7 +126,7 @@ export async function takeover(documentName: string) {
     isSavedS.setValue(true)
     ls.setTemplateDocument({
       name: documentNameS.getValue(),
-      typstSource: await getCurrentSource(session),
+      typstSource: view.state.doc.toString()
     })
   })
 
@@ -242,7 +137,7 @@ export async function takeover(documentName: string) {
     }
     ls.setTemplateDocument({
       name: ans,
-      typstSource: await getCurrentSource(session),
+      typstSource: view.state.doc.toString()
     })
     documentNameS.setValue(ans)
     isSavedS.setValue(true)
@@ -288,13 +183,12 @@ export async function takeover(documentName: string) {
     parent: shadow,
     root: shadow,
   });
-  session.setCodeMirrorInstance(view)
 
   // Whenever code is changed, the document is no longer saved.
   codeEditS.listen(() => isSavedS.setValue(false))
 
-  const compiler = await (await session.getNewCompilerBuilder()).build()
-  compiler.add_source("/main.typ", await getCurrentSource(session))
+  const compiler = await (await session().getNewCompilerBuilder()).build()
+  compiler.add_source("/main.typ", view.state.doc.toString())
   compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
   compiler.add_source("/pdf-template-field-inputs.json", "{}")
   const incrCompiler = compiler.create_incr_server()
@@ -407,7 +301,6 @@ export async function takeover(documentName: string) {
           fieldValues[elem.label] = elem.value
           continue
         }
-        assertNever(elem)
       }
       compiler.add_source(
         "/pdf-template-field-inputs.json",
@@ -424,7 +317,7 @@ export async function takeover(documentName: string) {
       const sessionOptions = new r.CreateSessionOptions()
       sessionOptions.format = "vector"
       sessionOptions.artifact_content = artifact
-      const renderer = await session.getRenderer()
+      const renderer = await session().getRenderer()
       const rsession = renderer.create_session(sessionOptions)
 
       // Why try-catch? See:
@@ -463,8 +356,4 @@ export async function takeover(documentName: string) {
   updateBtn.addEventListener("click", () => {
     compilationStatusS.triggerUpdate()
   })
-}
-
-async function getCurrentSource(session: Session): Promise<string> {
-  return (await session.codemirror).state.doc.toString()
 }
