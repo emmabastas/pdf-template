@@ -1,4 +1,4 @@
-import { session } from "./session"
+import { Session } from "./session"
 import { ShortTextField, LongTextField, NumberField } from "./components"
 import { typstFieldQueryParser } from "./parsers"
 import type { Field } from "./parsers"
@@ -7,7 +7,6 @@ import * as utils from "./utils"
 import * as ls from "./localstorage"
 import * as router from "./router"
 
-import * as r from "@myriaddreamin/typst-ts-renderer"
 import * as v from "ts-json-validator"
 import { EditorView, basicSetup } from "codemirror"
 import { EditorState } from "@codemirror/state"
@@ -187,7 +186,7 @@ export async function takeover(documentName: string) {
   // Whenever code is changed, the document is no longer saved.
   codeEditS.listen(() => isSavedS.setValue(false))
 
-  const compiler = await (await session().getNewCompilerBuilder()).build()
+  const compiler = await (await Session.instance().getNewCompilerBuilder()).build()
   compiler.add_source("/main.typ", view.state.doc.toString())
   compiler.add_source("/pdf-template.typ", pdfTemplateTypstSource)
   compiler.add_source("/pdf-template-field-inputs.json", "{}")
@@ -314,10 +313,11 @@ export async function takeover(documentName: string) {
         throw new Error("Unreachable")
       }
 
-      const sessionOptions = new r.CreateSessionOptions()
+
+      const sessionOptions = await Session.instance().createSessionOptions()
       sessionOptions.format = "vector"
       sessionOptions.artifact_content = artifact
-      const renderer = await session().getRenderer()
+      const renderer = await Session.instance().getRenderer()
       const rsession = renderer.create_session(sessionOptions)
 
       // Why try-catch? See:

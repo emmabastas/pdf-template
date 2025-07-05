@@ -25,13 +25,17 @@ const textFontsPrefix = "https://cdn.jsdelivr.net/gh/typst/typst-assets@v0.13.1/
 
 // This class is in charge of loading all the async data we need in as
 // nonblocking a maner as feasible.
+declare global {
+    var sessionInstance: Session | undefined;
+}
+
 export class Session {
   private renderer: Promise<r.TypstRenderer>
   private fontData: Promise<Uint8Array<ArrayBufferLike>[]>
   private cInitialized: Promise<void>
   private rInitialized: Promise<void>
 
-  constructor() {
+  private constructor() {
     const cwasmp: Promise<WebAssembly.Module> = WebAssembly.compileStreaming(
       fetch(new URL("../node_modules/@myriaddreamin/typst-ts-web-compiler/pkg/typst_ts_web_compiler_bg.wasm", import.meta.url))
     )
@@ -63,6 +67,19 @@ export class Session {
     })
   }
 
+  static instance(): Session {
+    if (typeof globalThis.sessionInstance !== "undefined") {
+      return globalThis.sessionInstance
+    }
+    globalThis.sessionInstance = new Session()
+    return globalThis.sessionInstance
+  }
+
+  async createSessionOptions(): Promise<r.CreateSessionOptions> {
+    await this.rInitialized
+    return new r.CreateSessionOptions()
+  }
+
   async getRenderer(): Promise<r.TypstRenderer> {
     return this.renderer
   }
@@ -76,13 +93,4 @@ export class Session {
     }
     return builder
   }
-}
-
-let currentSession : Session | null = null
-export function session(): Session {
-  if (currentSession !== null) {
-    return currentSession
-  }
-  currentSession = new Session()
-  return currentSession
 }
