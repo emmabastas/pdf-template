@@ -54,7 +54,11 @@ export class Session {
 
     this.fontData = Promise.all(
       textFonts.map(async textFont => {
-        const resp = await fetch(new URL(textFontsPrefix + textFont))
+        const url = new URL(textFontsPrefix + textFont)
+        const resp = await fetch(url)
+        if (!resp.ok) {
+          throw new Error(`${url} failed with ${resp.status} ${resp.statusText}`)
+        }
         const bytes = await resp.bytes()
         return bytes
       })

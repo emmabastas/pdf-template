@@ -26,6 +26,71 @@ export type JSONLike =
   | JSONLike[]
   | { [key: string]: JSONLike }
 
+export function toDataObj(v: any, visited_?: Set<any>): JSONLike {
+  const visited = (function() {
+    if (visited_ !== undefined) {
+      return visited_
+    }
+    return new Set()
+  })()
+
+  if (visited.has(v)) {
+    return `<recurisve ${typeof v}>`
+  }
+
+  if (typeof v === "string") {
+    return v
+  }
+
+  if (typeof v === "number") {
+    return v
+  }
+
+  if (typeof v === "boolean") {
+    return v
+  }
+
+  if (typeof v === "function") {
+    return "<function>"
+  }
+
+  if (v instanceof Node) {
+    return "<Node>";
+  }
+
+  if (v instanceof Window) {
+    return "<Window>";
+  }
+
+  if (v === null) {
+    return null
+  }
+
+  if (Array.isArray(v)) {
+    return v.map(e => toDataObj(e, visited))
+  }
+
+  if (typeof v === "object") {
+    if (v instanceof Date) {
+        return v.toISOString()
+    }
+    if (v instanceof RegExp) {
+      return v.toString()
+    }
+
+    visited.add(v)
+    const obj: Record<string, JSONLike> = {}
+    for (let k in v) {
+      obj[k] = toDataObj(v[k], visited)
+    }
+    return obj
+
+    //return Object.fromEntries(Object.entries(v).map(([k, v]) => [k, toJSONLike(v)]).filter(([_, v]) => v !== undefined))
+  }
+
+  return `<${typeof v}>`
+}
+
 export function compare(a: JSONLike, b: JSONLike): boolean {
   if (a === b) {
     return true;
@@ -198,7 +263,6 @@ export function parseHTML(source: string): HTMLElement {
   const doc = domParser.parseFromString(`
   <head></head><body>${source}</body>
 `, "text/html")
-  console.log(doc.body)
   if (doc.body.firstElementChild instanceof HTMLElement) {
     return doc.body.firstElementChild
   }
@@ -207,7 +271,6 @@ export function parseHTML(source: string): HTMLElement {
 
 export function parseTemplate(source: string): DocumentFragment {
   const doc = domParser.parseFromString(source, "text/html")
-  console.log(doc)
   if ( doc.body.firstChild instanceof HTMLTemplateElement) {
     return doc.body.firstChild.content
   }

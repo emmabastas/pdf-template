@@ -1,6 +1,7 @@
 import { validatingParse, templateDocumentsParser } from "./parsers"
 import type { TemplateDocument } from "./parsers"
 import * as utils from "./utils"
+import { assert } from "./utils"
 
 export function allTemplateDocuments(): TemplateDocument[] {
   let s = localStorage.getItem("templateDocuments")
@@ -57,4 +58,30 @@ export function deleteTemplateDocument(name: string, prompt?: boolean) {
       overwrite(filtered)
     }
   }
+}
+
+type Diagnostics = "ask" | "no" | "yes"
+export function getSendDiagnostics(): Diagnostics {
+  const s = sessionStorage.getItem("sendDiagnostics")
+  if (s === null) {
+    return "ask"
+  }
+
+  assert(s === "ask" || s === "no" || s === "yes")
+
+  return s as Diagnostics
+}
+
+export function setSendDiagnostics(d: Diagnostics) {
+  sessionStorage.setItem("sendDiagnostics", d)
+}
+
+export function sessionId(): string {
+  const s = sessionStorage.getItem("sessionId")
+  if (s === null) {
+    const id = crypto.randomUUID()
+    sessionStorage.setItem("sessionId", id)
+    return id
+  }
+  return s
 }
