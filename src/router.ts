@@ -53,14 +53,14 @@ window.addEventListener("error", function(event: ErrorEvent) {
   //const data = utils.toDataObj(event) ?? null
   const data = {
     sessionId: ls.sessionId(),
-    asString: event.error.toString(),
-    eventMessage: event.message,
-    errorMessage: event.error?.message,
+    asString: event.error.toString().slice(0, 160),
+    eventMessage: event.message?.slice(0, 160),
+    errorMessage: event.error?.message?.slice(0, 160),
     lineno: event.lineno,
     colno: event.colno,
-    filename: event.filename,
+    filename: event.filename?.slice(0, 160),
     stack: (event.error?.stack?.toString()).slice(0, 160),
-    userAgent: navigator.userAgent,
+    userAgent: navigator.userAgent.slice(0, 160),
   }
 
   dialog.error(data, () => {
@@ -92,13 +92,13 @@ window.addEventListener("unhandledrejection", function (event) {
   //const data = utils.toDataObj(event) ?? null
   const data = {
     sessionId: ls.sessionId(),
-    asString: event.reason?.toString(),
-    errorMessage: event.reason?.message,
+    asString: event.reason?.toString().slice(0, 160),
+    errorMessage: event.reason?.message?.slice(0, 160),
     lineno: event.reason?.lineNumber,
     colno: event.reason?.columnNumber,
-    filename: event.reason?.filename,
+    filename: event.reason?.filename?.slice(0, 160),
     stack: (event.reason?.stack?.toString()).slice(0, 160),
-    userAgent: navigator.userAgent,
+    userAgent: navigator.userAgent.slice(0, 160),
   }
 
   dialog.error(data, () => {

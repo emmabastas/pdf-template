@@ -79,7 +79,16 @@ export function setSendDiagnostics(d: Diagnostics) {
 export function sessionId(): string {
   const s = sessionStorage.getItem("sessionId")
   if (s === null) {
-    const id = crypto.randomUUID()
+    // crypto.randomUUID is not available with http.
+    // We don't need randomUUID for anything critical,
+    // so we use a simple fallback.
+    const id = (() => {
+      if (crypto.randomUUID !== undefined) {
+        return crypto.randomUUID()
+      } else {
+        return Math.random().toString(36).substring(2, 15)
+      }
+    })()
     sessionStorage.setItem("sessionId", id)
     return id
   }
