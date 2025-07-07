@@ -3,7 +3,7 @@
   "scripts": {
       "watch": "parcel watch ./src/**/*.html ./src/**/*.ts ./src/**/*.css ./src/**/*.svg",
     "dev-server": "node server.js",
-    "publish": "rm -r ./dist && npx parcel build ./src/200.html ./src/index.html ./src/templates.html ./src/about.html --no-scope-hoist && surge ./dist pdf-template.surge.sh"
+    "publish": "rm -r ./dist && npx parcel build ./src/200.html ./src/index.html ./src/templates.html ./src/about.html --no-scope-hoist && cp ./static/* ./dist/ && surge ./dist pdf-template.surge.sh"
   },
   "devDependencies": {
     "@codemirror/commands": "^6.8.1",
