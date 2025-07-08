@@ -59,8 +59,7 @@ export class Session {
         if (!resp.ok) {
           throw new Error(`${url} failed with ${resp.status} ${resp.statusText}`)
         }
-        const bytes = await resp.bytes()
-        return bytes
+        return resp.bytes()
       })
     )
 

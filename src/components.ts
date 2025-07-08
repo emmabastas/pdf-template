@@ -616,22 +616,24 @@ export class IconDownload extends SVGIcon {
   }
 }
 
-let registerd = false
-function register() {
-  customElements.define('m-row', Row);
-  customElements.define('m-col', Col);
-  customElements.define('m-route', Route);
-  customElements.define('m-divider', Divider);
-  customElements.define('m-short-text', ShortTextField);
-  customElements.define('m-long-text', LongTextField);
-  customElements.define('m-number', NumberField);
-  customElements.define('m-template-item', TemplateItem);
-  customElements.define("m-icon-trash", IconTrash)
-  customElements.define("m-icon-rename", IconRename)
-  customElements.define("m-icon-duplicate", IconDuplicate)
-  customElements.define("m-icon-download", IconDownload)
-}
-if (registerd === false) {
-  registerd = true
-  register()
+export function initialize() {
+  let registerd = false
+  function register() {
+    customElements.define('m-row', Row);
+    customElements.define('m-col', Col);
+    customElements.define('m-route', Route);
+    customElements.define('m-divider', Divider);
+    customElements.define('m-short-text', ShortTextField);
+    customElements.define('m-long-text', LongTextField);
+    customElements.define('m-number', NumberField);
+    customElements.define('m-template-item', TemplateItem);
+    customElements.define("m-icon-trash", IconTrash)
+    customElements.define("m-icon-rename", IconRename)
+    customElements.define("m-icon-duplicate", IconDuplicate)
+    customElements.define("m-icon-download", IconDownload)
+  }
+  if (registerd === false) {
+    registerd = true
+    register()
+  }
 }
