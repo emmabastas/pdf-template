@@ -1,10 +1,15 @@
 {
   "source": "src/index.html",
   "scripts": {
-      "watch": "parcel watch ./src/**/*.html ./src/**/*.ts ./src/**/*.css ./src/**/*.svg",
+    "watch": "parcel watch ./src/**/*.html ./src/**/*.ts ./src/**/*.css ./src/**/*.svg",
     "dev-server": "node server.js",
-    "publish": "rm -r ./dist && npx parcel build ./src/200.html ./src/index.html ./src/templates.html ./src/about.html --no-scope-hoist && cp ./static/* ./dist/ && surge ./dist pdf-template.surge.sh"
+    "dev": "npm-run-all --parallel watch dev-server",
+    "build": "rm -rf ./dist && npx parcel build ./src/200.html ./src/index.html ./src/templates.html ./src/about.html --no-scope-hoist",
+    "publish": "npm run build && cp ./static/* ./dist/ && surge ./dist pdf-template.surge.sh"
   },
+  "browserslist": [
+    "defaults"
+  ],
   "devDependencies": {
     "@codemirror/commands": "^6.8.1",
     "@codemirror/state": "^6.5.2",
@@ -14,6 +19,7 @@
     "@parcel/transformer-inline-string": "^2.15.2",
     "@tailwindcss/postcss": "^4.1.11",
     "codemirror": "^6.0.2",
+    "npm-run-all": "^4.1.5",
     "parcel": "^2.15.2",
     "posthtml-include": "^2.0.1",
     "surge": "^0.24.6",
