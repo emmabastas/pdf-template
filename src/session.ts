@@ -1,5 +1,14 @@
 import * as c from "@myriaddreamin/typst-ts-web-compiler"
 import * as r from "@myriaddreamin/typst-ts-renderer"
+import c___wbg_init from "@myriaddreamin/typst-ts-web-compiler"
+import r___wbg_init from "@myriaddreamin/typst-ts-renderer"
+
+// TODO: In the future maybe some basic fonts can be loaded from the users
+//       machine locally, saving bandwidth.
+// https://developer.mozilla.org/en-US/docs/Web/API/Local_Font_Access_API
+
+// TODO: Cache fonts and WASM using cache API
+//       https://developer.mozilla.org/en-US/docs/Web/API/Cache
 
 const textFonts = [
     'DejaVuSansMono-Bold.ttf',
@@ -32,8 +41,8 @@ declare global {
 export class Session {
   private renderer: Promise<r.TypstRenderer>
   private fontData: Promise<Uint8Array<ArrayBufferLike>[]>
-  private cInitialized: Promise<void>
-  private rInitialized: Promise<void>
+  private cInitialized: Promise<c.InitOutput>
+  private rInitialized: Promise<r.InitOutput>
 
   private constructor() {
     const cwasmp: Promise<WebAssembly.Module> = WebAssembly.compileStreaming(
@@ -45,11 +54,11 @@ export class Session {
     )
 
     this.cInitialized = cwasmp.then(cwasm => {
-      const _ = c.initSync({ module: cwasm, })
+      return c___wbg_init({ module_or_path: cwasm })
     })
 
     this.rInitialized = rwasmp.then(rwasm => {
-      const _ = r.initSync({ module: rwasm, })
+      return r___wbg_init({ module_or_path: rwasm })
     })
 
     this.fontData = Promise.all(
